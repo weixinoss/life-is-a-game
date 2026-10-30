@@ -1,0 +1,30 @@
+# ---------- 运行时生成的配置 ----------
+# install.php 会生成这个文件，里面是数据库密码，绝对不能进仓库
+server/lib/config.php
+# 早期本地联调的废弃占位文件，已停用
+server/lib/config.local.php
+server/install.lock
+
+# ---------- 依赖与构建产物 ----------
+node_modules/
+dist/
+
+# ---------- 系统与编辑器 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ---------- 日志与临时目录 ----------
+*.log
+.tmp*/
+.verify/
+.probe/
+*.tmp
+
+# ---------- 本地工作区 ----------
+# AI 协作记录、会话缓存、个人笔记，不属于项目源码
+.workbuddy/

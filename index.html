@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23162b45'/%3E%3Ccircle cx='9.5' cy='9.5' r='3.2' fill='%23ff8a3d'/%3E%3Ccircle cx='22.5' cy='22.5' r='3.2' fill='%23ff8a3d'/%3E%3Ccircle cx='16' cy='16' r='3.2' fill='%23ffffff'/%3E%3C/svg%3E" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>人生就是一场游戏 · 一年四季</title>
+<link rel="stylesheet" href="css/net.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%; overflow: hidden;
+    background: linear-gradient(180deg, #a9dcff 0%, #cdeeff 38%, #eef9ff 62%, #fdf3dd 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+    color: #1b2a41; user-select: none;
+  }
+  #app { position: fixed; inset: 0; }
+  #app canvas { display: block; transition: filter .8s; }
+  body.low-stamina #app canvas { filter: saturate(.84) brightness(.95); }
+  body.low-spirit #app canvas { filter: saturate(.5) brightness(.88) contrast(.95); }
+  body.weather-night #app canvas { filter: brightness(1.02); }
+
+  /* ---------- 屏幕天气层 ---------- */
+  #weatherFx { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+
+  body.wx-snow::after, body.wx-cold::after {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 6;
+    background:
+      radial-gradient(58% 46% at 0% 0%, rgba(226,242,255,.62), transparent 72%),
+      radial-gradient(54% 42% at 100% 0%, rgba(226,242,255,.56), transparent 72%),
+      radial-gradient(48% 38% at 0% 100%, rgba(226,242,255,.5), transparent 72%),
+      radial-gradient(48% 38% at 100% 100%, rgba(226,242,255,.5), transparent 72%);
+  }
+  body.wx-fog::after {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 6;
+    background: rgba(238,244,249,.3);
+  }
+  body.wx-storm::before {
+    content: ''; position: fixed; inset: 0 0 auto 0; height: 20%; pointer-events: none; z-index: 6;
+    background: linear-gradient(180deg, rgba(140,180,215,.34), transparent);
+  }
+  body.wx-hot::after {
+    content: ''; position: fixed; left: 0; right: 0; bottom: 0; height: 44%;
+    pointer-events: none; z-index: 6;
+    background: linear-gradient(0deg, rgba(255,146,48,.26), transparent 78%);
+    animation: heatWave 3.8s ease-in-out infinite alternate;
+  }
+  @keyframes heatWave {
+    from { transform: translateY(0) scaleY(1); opacity: .72; }
+    to { transform: translateY(-7px) scaleY(1.06); opacity: 1; }
+  }
+  body.wx-rain #app canvas, body.wx-storm #app canvas { filter: saturate(.94) brightness(.97); }
+
+  /* ---------- 每日小票 ---------- */
+  #ticket {
+    position: fixed; z-index: 13; left: 18px; bottom: 96px;
+    width: 236px; padding: 14px 16px 12px;
+    background: #fdfbf3; color: #2b3a4a;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Courier New", monospace;
+    font-size: 11px; line-height: 1.7;
+    box-shadow: 0 14px 34px rgba(20,45,75,.22), 0 1px 0 rgba(0,0,0,.06);
+    border-radius: 3px;
+    transform: translateX(-120%) rotate(-1.2deg);
+    opacity: 0; pointer-events: none;
+    transition: transform .45s cubic-bezier(.2,.9,.3,1.2), opacity .35s;
+  }
+  #ticket.show { transform: translateX(0) rotate(-1.2deg); opacity: 1; }
+  #ticket::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -7px; height: 7px;
+    background: radial-gradient(circle at 5px 0, #fdfbf3 0 4.5px, transparent 5px) 0 0/10px 7px repeat-x;
+  }
+  .tk-head { text-align: center; font-weight: 900; letter-spacing: .32em; font-size: 11px; color: #46586a; }
+  .tk-sub { text-align: center; font-size: 9.5px; color: #93a3b2; margin-bottom: 6px; letter-spacing: .1em; }
+  .tk-hr { border-top: 1px dashed #c9d3dc; margin: 6px 0; }
+  .tk-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .tk-row span { color: #6b7f90; }
+  .tk-row b { font-weight: 800; letter-spacing: .02em; }
+  .tk-row b.in { color: #1a7a44; }
+  .tk-row b.out { color: #b4451f; }
+  .tk-row.total { margin-top: 2px; font-size: 12px; }
+  .tk-row.total b { color: #0f2740; }
+  .tk-foot { margin-top: 8px; text-align: center; font-size: 9px; color: #a9b6c2; letter-spacing: .16em; }
+
+  /* ---------- 标题 ---------- */
+  #hero {
+    position: fixed; top: max(8px, env(safe-area-inset-top)); left: 50%;
+    transform: translateX(-50%); z-index: 12; text-align: center;
+    pointer-events: none; width: max-content; max-width: 96vw;
+  }
+  #hero h1 {
+    display: inline-block; font-size: clamp(19px, 2.6vw, 34px);
+    font-weight: 900; letter-spacing: .1em; line-height: 1.15;
+    background: linear-gradient(180deg, #fff3d0 0%, #ffd24d 30%, #ff9f1c 65%, #ea580c 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 1.5px 0 #9a3412) drop-shadow(0 5px 14px rgba(20,50,90,.28));
+    padding: 0 .1em .03em;
+  }
+  #hero .sub {
+    font-size: clamp(8.5px, .92vw, 10.5px); font-weight: 700;
+    letter-spacing: .3em; color: #24618f; opacity: .7;
+    text-shadow: 0 1px 0 rgba(255,255,255,.9);
+  }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    position: fixed; z-index: 12; left: 50%; transform: translateX(-50%); top: 76px;
+    padding: 8px 12px 9px; border-radius: 18px;
+    background: rgba(255,255,255,.76);
+    backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5);
+    box-shadow: 0 10px 30px rgba(15,40,70,.14), inset 0 0 0 1.5px rgba(255,255,255,.85);
+  }
+  .topline { display: flex; align-items: center; gap: 8px; padding: 0 4px 7px; }
+  #seasonTag {
+    font-size: 12px; font-weight: 900; color: #fff; padding: 2px 10px; border-radius: 999px;
+    background: #6fbf5a; letter-spacing: .1em; transition: background .5s;
+  }
+  .days { font-size: 11px; font-weight: 800; color: #33566f; letter-spacing: .04em; }
+  .days b { font-size: 14px; color: #f97316; }
+  #weatherTag {
+    margin-left: auto; font-size: 11.5px; font-weight: 800; color: #374f63;
+    background: rgba(230,242,250,.9); padding: 2px 9px; border-radius: 999px; white-space: nowrap;
+  }
+  .stats { display: flex; align-items: stretch; gap: 0; }
+  .stat { position: relative; width: 86px; padding: 1px 8px 0; border-right: 1px solid rgba(70,110,145,.1); }
+  .stat:last-child { border-right: none; }
+  .stat .k { display: block; font-size: 9.5px; font-weight: 800; letter-spacing: .1em; color: #6b8ba5; line-height: 1.1; margin-bottom: 1px; }
+  .stat b {
+    display: block; font-size: 15px; font-weight: 900; line-height: 1.15; color: #16324a;
+    font-variant-numeric: tabular-nums; font-feature-settings: "tnum";
+    transition: color .25s;
+  }
+  .stat b.neg { color: #dc2626; }
+  .stat b.bump { animation: bump .4s; }
+  @keyframes bump { 0% { transform: scale(1); } 35% { transform: scale(1.16); } 100% { transform: scale(1); } }
+  .stat[data-k="money"] b { color: #b45309; }
+  .stat[data-k="money"] b.neg { color: #dc2626; }
+  .left {
+    display: block; font-size: 8.5px; font-weight: 800; color: #a8785a;
+    letter-spacing: 0; margin-top: 1px; white-space: nowrap; line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+  .left.warn { color: #dc2626; }
+  .track { display: block; height: 3.5px; border-radius: 3px; margin-top: 3px; background: rgba(30,60,90,.09); overflow: hidden; }
+  .fill { display: block; height: 100%; border-radius: 3px; transition: width .45s cubic-bezier(.2,.9,.3,1), background .3s; }
+  .fill.sta { background: linear-gradient(90deg, #34d399, #10b981); }
+  .fill.spirit { background: linear-gradient(90deg, #60a5fa, #3b82f6); }
+  .fill.face { background: linear-gradient(90deg, #c084fc, #a855f7); }
+  .fill.low { background: linear-gradient(90deg, #fb7185, #ef4444); }
+  body.low-stamina .stat[data-k="stamina"] b { color: #dc2626; }
+  body.low-spirit .stat[data-k="spirit"] b { color: #dc2626; }
+
+  .float {
+    position: absolute; right: 4px; top: -4px; font-size: 11.5px; font-weight: 900;
+    pointer-events: none; animation: floatUp 1.15s ease-out forwards;
+    text-shadow: 0 1px 3px rgba(255,255,255,.9);
+  }
+  .float.good { color: #16a34a; }
+  .float.bad { color: #dc2626; }
+  @keyframes floatUp {
+    0% { opacity: 0; transform: translateY(4px) scale(.9); }
+    25% { opacity: 1; transform: translateY(-2px) scale(1.05); }
+    100% { opacity: 0; transform: translateY(-24px) scale(1); }
+  }
+
+  #weatherTip {
+    position: fixed; z-index: 11; left: 50%; transform: translateX(-50%); top: 172px;
+    font-size: 10.5px; font-weight: 700; color: #55738a; letter-spacing: .04em;
+    background: rgba(255,255,255,.55); padding: 4px 12px; border-radius: 999px;
+    backdrop-filter: blur(8px); pointer-events: none; white-space: nowrap; max-width: 92vw;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ---------- 事件面板 ---------- */
+  #panel {
+    position: fixed; z-index: 14; left: 50%; bottom: 86px;
+    transform: translateX(-50%) translateY(34px) scale(.97);
+    width: 400px; max-height: 56vh;
+    display: flex; flex-direction: column;
+    border-radius: 30px; overflow: hidden;
+    background: #fbfcfe;
+    border: 7px solid #16283c;
+    box-shadow: 0 26px 60px rgba(10,25,45,.42), inset 0 0 0 1px rgba(255,255,255,.6);
+    opacity: 0; pointer-events: none;
+    transition: opacity .32s, transform .38s cubic-bezier(.2,.9,.3,1.15);
+  }
+  #panel.show { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); pointer-events: auto; }
+  #panel::before {
+    content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 104px; height: 15px; background: #16283c; border-radius: 0 0 13px 13px; z-index: 3;
+  }
+  .pstatus {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 16px 3px; font-size: 9px; font-weight: 800; color: #6b8299;
+    letter-spacing: .06em; background: #eef3f8;
+  }
+  .pstatus .bat { color: #3f8f5c; }
+  .pbar { height: 5px; flex: none; background: #6fbf5a; transition: background .4s; }
+  /* ---------- 事件头部：谁来通知你这件事 ----------
+     街面/天气类（data-chan=life）不伪装成消息，保留原来的地点+天气行 */
+  .phead {
+    flex: none; display: none; align-items: center; gap: 9px;
+    padding: 11px 16px 0;
+  }
+  .pav {
+    flex: 0 0 auto; width: 33px; height: 33px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14.5px; font-weight: 900; color: #fff; letter-spacing: 0;
+    background: #7d8fa3; box-shadow: 0 2px 7px rgba(15,32,52,.18);
+  }
+  .pwho { display: flex; flex-direction: column; min-width: 0; }
+  .pwho b {
+    font-size: 14px; font-weight: 900; color: #16324a; line-height: 1.24;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pchan { font-style: normal; font-size: 9px; font-weight: 800; letter-spacing: .06em; color: #8698a8; margin-top: 1px; }
+  .pstate { margin-left: auto; font-size: 9.5px; font-weight: 800; color: #8698a8; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pmeta { flex: none; display: flex; align-items: center; gap: 8px; padding: 12px 18px 0; }
+  .psite { font-size: 15px; font-weight: 900; color: #16324a; letter-spacing: .02em; }
+  .pjob { font-size: 10px; font-weight: 800; color: #fff; padding: 3px 9px; border-radius: 999px; background: #64748b; white-space: nowrap; }
+
+  #panel[data-chan]:not([data-chan="life"]) .phead { display: flex; }
+  /* 有来信人时，"春季·第 1 天"和顶部状态栏的"春·01"重复、
+     天气又和 HUD 右上角重复，这一行整行收掉 */
+  #panel[data-chan]:not([data-chan="life"]) .pmeta { display: none; }
+  #panel[data-chan]:not([data-chan="life"]) .pjob {
+    font-size: 9px; padding: 2px 7px; background: #eef3f8; color: #7b8fa2;
+  }
+
+  /* 渠道色：钉钉蓝 / 微信绿 / 短信灰 / 银行红 / 医院青 */
+  #panel[data-chan="dingtalk"] .pav { background: #3a86d6; }
+  #panel[data-chan="dingtalk"] .pchan { color: #3a86d6; }
+  #panel[data-chan="wechat"] .pav { background: #3dbb61; }
+  #panel[data-chan="wechat"] .pchan { color: #2e9c4c; }
+  #panel[data-chan="sms"] .pav { background: #8a919a; }
+  #panel[data-chan="sms"] .pchan { color: #8a919a; }
+  #panel[data-chan="bank"] .pav { background: #c0392b; }
+  #panel[data-chan="bank"] .pchan { color: #b0392c; }
+  #panel[data-chan="health"] .pav { background: #2f8f92; }
+  #panel[data-chan="health"] .pchan { color: #2f8f92; }
+
+  /* 描述随渠道换材质：微信像对话，短信像机打，账单可直接对账 */
+  #panel[data-chan="wechat"] #pDesc {
+    background: #f0f7ed; border-left-color: #a8d5b5; border-radius: 0 12px 12px 0;
+    padding: 9px 12px; color: #4a6b57;
+  }
+  #panel[data-chan="dingtalk"] #pDesc {
+    background: #f2f7fd; border-left-color: #b3d1ef; color: #4f6a84;
+  }
+  #panel[data-chan="sms"] #pDesc {
+    background: #f6f7f9; border-left-color: #c6cdd5; color: #5c6672;
+    letter-spacing: .01em;
+  }
+  #panel[data-chan="bank"] #pDesc {
+    background: #fdf5f3; border-left-color: #eec6bd; color: #7a5a52;
+    font-variant-numeric: tabular-nums;
+  }
+  #panel[data-chan="health"] #pDesc {
+    background: #f1f8f8; border-left-color: #b8dcdb; color: #4f6e6e;
+  }
+  .pbody { padding: 9px 18px 18px; overflow-y: auto; }
+  .pbody::-webkit-scrollbar { width: 4px; }
+  .pbody::-webkit-scrollbar-thumb { background: #d3e2ee; border-radius: 2px; }
+  #pTitle { font-size: 17.5px; font-weight: 900; line-height: 1.35; color: #102a43; }
+  #pDesc { margin-top: 7px; font-size: 12.5px; line-height: 1.72; color: #62798c; padding-left: 11px; border-left: 2.5px solid #e2ecf4; }
+  .popts { margin-top: 14px; }
+  .opt {
+    display: block; width: 100%; text-align: left; font-family: inherit;
+    padding: 10px 13px; margin-bottom: 7px; border-radius: 14px;
+    border: 1.5px solid #e0eaf3; background: #fff; cursor: pointer;
+    transition: border-color .16s, background .16s, transform .16s, opacity .2s;
+    animation: optIn .3s both;
+  }
+  @keyframes optIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .opt:hover { border-color: #fb923c; background: #fff9f3; transform: translateX(-2px); }
+  .opt .ot { display: block; font-size: 13px; font-weight: 800; color: #1b3a52; line-height: 1.4; }
+  .opt .oc { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+  .opt .oc i { font-style: normal; font-size: 10.5px; font-weight: 800; padding: 2px 6px; border-radius: 5px; font-variant-numeric: tabular-nums; }
+  .opt .oc .up { background: #e9f8ee; color: #15803d; }
+  .opt .oc .dn { background: #fdeceb; color: #c2410c; }
+  .opt .oc .warn { background: #fef2f2; color: #b91c1c; }
+  .opt.dim { opacity: .32; }
+  .opt.picked { border-color: #f97316; background: #fff7ee; opacity: 1; }
+  .opt[disabled] { cursor: default; }
+  .opt[disabled]:hover { transform: none; }
+  .opt.tired { background: #f8fafc; border-style: dashed; opacity: .5; }
+
+  .pfeed {
+    margin-top: 9px; font-size: 12px; line-height: 1.7; color: #7a5a35;
+    background: #fdf7ea; border-left: 3px solid #f0b93a;
+    padding: 0 12px; border-radius: 0 10px 10px 0;
+    max-height: 0; opacity: 0; overflow: hidden;
+    transition: max-height .35s, opacity .3s, padding .3s;
+  }
+  .pfeed.show { max-height: 150px; opacity: 1; padding: 9px 12px; }
+
+  /* ---------- 底部 ---------- */
+  body.phone-open #dock { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(14px); }
+  #dock {
+    position: fixed; bottom: max(14px, env(safe-area-inset-bottom)); left: 50%;
+    transform: translateX(-50%); z-index: 12;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 11px; border-radius: 999px;
+    background: rgba(255,255,255,.74); backdrop-filter: blur(18px) saturate(1.4);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    box-shadow: 0 14px 34px rgba(15,40,70,.18), inset 0 0 0 1.5px rgba(255,255,255,.85);
+  }
+  .btn {
+    border: none; cursor: pointer; font-family: inherit;
+    font-weight: 800; font-size: 13px; letter-spacing: .03em;
+    padding: 10px 17px; border-radius: 999px; color: #fff;
+    background: linear-gradient(180deg, #ffc061 0%, #fb923c 55%, #f97316 100%);
+    box-shadow: 0 4px 0 #c2410c, 0 10px 20px rgba(249,115,22,.32);
+    transition: transform .12s, box-shadow .12s, filter .15s, opacity .2s;
+    white-space: nowrap;
+  }
+  #dock { transition: opacity .3s, transform .3s; }
+  .btn:hover { filter: brightness(1.06); }
+  .btn.ghost.on { background: rgba(255,255,255,.9); color: #0d2136; }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #c2410c; }
+  .btn[disabled] { opacity: .45; pointer-events: none; }
+  .btn.ghost {
+    color: #24506f; background: rgba(255,255,255,.92); font-size: 12px;
+    box-shadow: 0 3px 0 #c7d9e6, 0 8px 16px rgba(30,70,110,.1);
+  }
+  .btn.ghost:active { transform: translateY(2px); box-shadow: 0 1px 0 #c7d9e6; }
+  .btn.ghost.used { opacity: .35; }
+  #rollBtn:not([disabled]) { animation: breathe 2.6s ease-in-out infinite; }
+  @keyframes breathe {
+    0%, 100% { box-shadow: 0 4px 0 #c2410c, 0 10px 20px rgba(249,115,22,.3); }
+    50% { box-shadow: 0 4px 0 #c2410c, 0 10px 30px rgba(249,115,22,.6), 0 0 0 5px rgba(249,115,22,.12); }
+  }
+  .dice-box {
+    width: 38px; height: 38px; border-radius: 11px; background: #fff;
+    box-shadow: inset 0 0 0 2px #e2ebf2, 0 6px 14px rgba(30,70,110,.14);
+    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+    padding: 6px; gap: 2px;
+  }
+  .dice-box.roll { animation: rollSpin .5s cubic-bezier(.3,.8,.4,1); }
+  @keyframes rollSpin {
+    0% { transform: rotate(0) scale(1); }
+    45% { transform: rotate(200deg) scale(1.14); }
+    100% { transform: rotate(360deg) scale(1); }
+  }
+  .pip { border-radius: 50%; background: transparent; }
+  .pip.on { background: linear-gradient(145deg, #35516e, #16283c); }
+
+  /* ---------- Toast ---------- */
+  #toast {
+    position: fixed; z-index: 16; left: 50%; top: 218px;
+    transform: translate(-50%, -8px);
+    max-width: min(560px, 90vw);
+    font-size: 12px; line-height: 1.6; font-weight: 700;
+    color: #fff; background: rgba(24,42,60,.9);
+    padding: 9px 17px; border-radius: 14px;
+    box-shadow: 0 14px 34px rgba(10,30,55,.28);
+    opacity: 0; pointer-events: none; transition: .35s; text-align: center;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #toast.rent { background: linear-gradient(135deg, #b91c1c, #dc2626); }
+  #toast.moon { background: linear-gradient(135deg, #1e3a5f, #2c5282); }
+
+  /* ---------- 选择职业（3D 炫彩） ---------- */
+  #pick {
+    position: fixed; inset: 0; z-index: 40;
+    display: grid; place-items: center;
+    padding: 16px 14px; overflow: hidden;
+    background: #08111f;
+    transition: opacity .55s, transform .55s;
+  }
+  #pick.hide { opacity: 0; transform: scale(1.04); pointer-events: none; }
+
+  .pk-bg {
+    position: absolute; inset: -25%;
+    filter: blur(90px); opacity: .62;
+    background:
+      radial-gradient(38% 38% at 24% 26%, var(--b1, #3b82f6), transparent 64%),
+      radial-gradient(38% 38% at 78% 30%, var(--b2, #8b5cf6), transparent 64%),
+      radial-gradient(44% 40% at 50% 84%, var(--b3, #06b6d4), transparent 68%);
+    transition: background 1s ease;
+    animation: pkDrift 22s ease-in-out infinite alternate;
+  }
+  @keyframes pkDrift {
+    from { transform: translate3d(-2%, -1%, 0) scale(1); }
+    to { transform: translate3d(3%, 2%, 0) scale(1.14); }
+  }
+  .pk-grain {
+    position: absolute; inset: 0; opacity: .05; pointer-events: none;
+    background-image: radial-gradient(#fff 1px, transparent 1px);
+    background-size: 4px 4px;
+  }
+  .pk-vig {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(120% 90% at 50% 50%, transparent 40%, rgba(4,9,18,.78));
+  }
+
+  .pick-in { position: relative; z-index: 2; width: min(1080px, 100%); text-align: center; }
+  .pick-title h2 {
+    font-size: clamp(19px, 2.5vw, 28px); font-weight: 900; color: #fff;
+    letter-spacing: .1em; text-shadow: 0 3px 24px rgba(0,0,0,.5);
+  }
+  .pick-title p {
+    margin-top: 6px; font-size: 11.5px; color: rgba(255,255,255,.62);
+    font-weight: 700; letter-spacing: .1em;
+  }
+
+  /* 风格切换 */
+  .pk-switch {
+    position: absolute; right: 0; top: -2px; z-index: 8;
+    display: flex; gap: 4px; padding: 4px; border-radius: 999px;
+    background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.16);
+    backdrop-filter: blur(10px);
+  }
+  .pk-switch button {
+    border: none; background: transparent; cursor: pointer;
+    font-family: inherit; font-size: 10.5px; font-weight: 900; letter-spacing: .08em;
+    color: rgba(255,255,255,.55); padding: 5px 11px; border-radius: 999px;
+    transition: .22s;
+  }
+  .pk-switch button.on { background: rgba(255,255,255,.9); color: #0b1626; }
+  .pk-switch button:hover:not(.on) { color: #fff; }
+
+  /* 3D 舞台 */
+  .pick-stage {
+    position: relative; height: 424px; margin-top: 14px;
+    perspective: 1350px; perspective-origin: 50% 42%;
+    transform-style: preserve-3d;
+  }
+  .jobcard {
+    position: absolute; left: 50%; top: 50%;
+    width: 302px; height: 396px; margin: -198px 0 0 -151px;
+    border: none; padding: 0; background: transparent; cursor: pointer;
+    font-family: inherit; transform-style: preserve-3d;
+    transition: transform .6s cubic-bezier(.2,.9,.28,1), opacity .5s, filter .5s;
+    outline: none;
+  }
+  .jobcard .jc-front {
+    position: absolute; inset: 0; border-radius: 26px; overflow: hidden;
+    transform-style: preserve-3d;
+    border: 1.5px solid rgba(255,255,255,.25);
+    box-shadow: 0 28px 66px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.2);
+    transition: box-shadow .4s, border-color .4s;
+  }
+  .jobcard.cur { will-change: transform; }
+  .jobcard.cur .jc-front {
+    border-color: rgba(255,255,255,.55);
+    box-shadow: 0 34px 80px rgba(0,0,0,.55), 0 0 54px var(--glow, rgba(255,255,255,.35));
+  }
+
+  /* 炫彩底层 */
+  .jc-chroma {
+    position: absolute; inset: -52%;
+    background: conic-gradient(from 0deg, var(--g1), var(--g2), var(--g3), var(--g1));
+  }
+  /* 旋转动画只跑在正面那张，21 张一起跑会把手机拖垮 */
+  .jobcard.cur .jc-chroma { animation: chromaSpin 11s linear infinite; }
+  @keyframes chromaSpin { to { transform: rotate(360deg); } }
+  .jc-shine {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(78% 58% at 16% 10%, rgba(255,255,255,.55), transparent 58%),
+      radial-gradient(70% 66% at 86% 94%, rgba(0,0,0,.5), transparent 60%);
+    mix-blend-mode: overlay;
+  }
+  .jc-sheen {
+    position: absolute; inset: -30%;
+    background: linear-gradient(115deg, transparent 38%, rgba(255,255,255,.42) 50%, transparent 62%);
+    transform: translateX(var(--sheen, -40%));
+    transition: transform .5s;
+  }
+
+  /* 内容层 */
+  .jc-in {
+    position: absolute; inset: 0; z-index: 3;
+    padding: 19px 20px 17px; display: flex; flex-direction: column;
+    background: linear-gradient(168deg, rgba(6,13,26,.24), rgba(6,13,26,.6));
+    text-align: left;
+  }
+  #pick.sk-glass .jc-in { background: linear-gradient(168deg, rgba(6,13,26,.14), rgba(6,13,26,.44)); backdrop-filter: blur(4px); }
+  #pick.sk-neon .jc-in { background: linear-gradient(168deg, rgba(3,6,14,.6), rgba(3,6,14,.86)); }
+
+  .jc-top { display: flex; justify-content: space-between; align-items: center; }
+  .ji {
+    width: 50px; height: 50px; border-radius: 15px;
+    display: grid; place-items: center;
+    font-size: 23px; font-weight: 900; color: #fff;
+    background: rgba(255,255,255,.17); border: 1.5px solid rgba(255,255,255,.42);
+    box-shadow: 0 7px 18px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.4);
+    text-shadow: 0 2px 8px rgba(0,0,0,.35);
+  }
+  #pick.sk-neon .ji {
+    background: transparent; box-shadow: 0 0 16px var(--glow), inset 0 0 14px rgba(255,255,255,.12);
+    border-color: rgba(255,255,255,.75); text-shadow: 0 0 12px #fff;
+  }
+  .jc-money {
+    font-size: 10.5px; font-weight: 900; letter-spacing: .05em;
+    padding: 5px 11px; border-radius: 999px; color: #fff;
+    background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.28);
+  }
+  .jc-name {
+    margin-top: 15px; font-size: 26px; font-weight: 900; letter-spacing: .01em; color: #fff;
+    text-shadow: 0 3px 16px rgba(0,0,0,.55);
+  }
+  #pick.sk-neon .jc-name { text-shadow: 0 0 18px var(--glow), 0 3px 16px rgba(0,0,0,.6); }
+  .jc-tag {
+    margin-top: 5px; font-size: 11px; font-weight: 800; letter-spacing: .1em;
+    color: rgba(255,255,255,.72);
+  }
+  .jc-desc {
+    margin-top: 13px; font-size: 11.5px; line-height: 1.85; color: rgba(255,255,255,.82);
+  }
+  .jc-stats { margin-top: 14px; display: flex; flex-direction: column; gap: 7px; }
+  .st-row { display: flex; align-items: center; gap: 8px; font-size: 9.5px; font-weight: 800; }
+  .st-row > span { width: 26px; color: rgba(255,255,255,.62); letter-spacing: .06em; flex: none; }
+  .st-bar {
+    flex: 1; height: 5px; border-radius: 99px; overflow: hidden;
+    background: rgba(255,255,255,.18);
+  }
+  .st-bar i {
+    display: block; height: 100%; width: 0; border-radius: 99px;
+    background: linear-gradient(90deg, rgba(255,255,255,.7), #fff);
+    box-shadow: 0 0 9px rgba(255,255,255,.7);
+    transition: width .8s cubic-bezier(.2,.9,.3,1);
+  }
+  #pick.sk-neon .st-bar i { box-shadow: 0 0 12px var(--glow); }
+  .st-row > b {
+    width: 46px; flex: none; text-align: right; color: #fff; white-space: nowrap;
+    font-variant-numeric: tabular-nums; font-size: 9.5px; line-height: 1.1;
+  }
+  .jc-perk {
+    margin-top: auto; font-size: 10.5px; line-height: 1.75;
+    padding: 9px 11px; border-radius: 12px; color: rgba(255,255,255,.9);
+    background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.2);
+  }
+
+  /* 侧卡压暗 */
+  .jobcard:not(.cur) .jc-front { filter: brightness(.52) saturate(.72); }
+  .jobcard:not(.cur):hover .jc-front { filter: brightness(.74) saturate(.9); }
+
+  /* 导航 */
+  .pick-nav {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 7;
+    width: 42px; height: 42px; border-radius: 50%; cursor: pointer;
+    background: rgba(255,255,255,.11); border: 1px solid rgba(255,255,255,.24);
+    color: #fff; font-size: 20px; line-height: 1; backdrop-filter: blur(8px);
+    transition: .2s;
+  }
+  .pick-nav:hover { background: rgba(255,255,255,.26); }
+  .pick-nav.prev { left: 4px; }
+  .pick-nav.next { right: 4px; }
+
+  .pick-dots { display: flex; justify-content: center; gap: 7px; margin-top: 6px; }
+  .pick-dots i {
+    width: 6px; height: 6px; border-radius: 99px;
+    background: rgba(255,255,255,.28); cursor: pointer; transition: .3s;
+  }
+  .pick-dots i.on { width: 22px; background: #fff; box-shadow: 0 0 12px var(--glow, rgba(255,255,255,.5)); }
+
+  .pick-go {
+    margin: 15px auto 0; display: block;
+    padding: 12px 36px; border: none; border-radius: 999px; cursor: pointer;
+    font-family: inherit; font-size: 14.5px; font-weight: 900; letter-spacing: .12em;
+    color: #08111f; background: #fff;
+    box-shadow: 0 12px 32px rgba(0,0,0,.4), 0 0 30px var(--glow, rgba(255,255,255,.35));
+    transition: transform .16s, box-shadow .16s;
+  }
+  .pick-go:hover { transform: translateY(-2px); }
+  .pick-go:active { transform: scale(.97); }
+  .pick-go small {
+    display: block; margin-top: 2px; font-size: 9px; font-weight: 800;
+    letter-spacing: .06em; opacity: .55;
+  }
+
+  /* ---------- 季节过场 ---------- */
+  #seasonCard {
+    position: fixed; inset: 0; z-index: 35; display: grid; place-items: center;
+    background: rgba(10,22,38,.5); backdrop-filter: blur(10px);
+    opacity: 0; visibility: hidden; transition: opacity .45s, visibility .45s; padding: 20px;
+  }
+  #seasonCard.show { opacity: 1; visibility: visible; }
+  .sc-in {
+    width: min(420px, 100%); border-radius: 26px; padding: 30px 28px 24px;
+    background: #fffdf9; box-shadow: 0 30px 80px rgba(0,0,0,.35);
+    text-align: center; position: relative; overflow: hidden;
+    transform: translateY(14px) scale(.96); transition: .5s cubic-bezier(.2,.9,.3,1.2);
+  }
+  #seasonCard.show .sc-in { transform: none; }
+  .sc-in::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 7px; background: var(--season-color, #6fbf5a); }
+  #scNum { font-size: 10px; font-weight: 900; letter-spacing: .3em; color: #9db2c4; }
+  #scName { font-size: 40px; font-weight: 900; color: #10334f; margin-top: 6px; letter-spacing: .1em; }
+  #scSub { font-size: 11px; font-weight: 800; letter-spacing: .2em; color: var(--season-color, #6fbf5a); margin-top: 4px; }
+  #scIntro { margin-top: 16px; font-size: 12.5px; line-height: 1.9; color: #5b7183; }
+  #scRent { margin-top: 14px; font-size: 11.5px; font-weight: 800; color: #b45309; background: #fdf7ea; padding: 8px; border-radius: 10px; }
+
+  /* ---------- 结局 ---------- */
+  #over {
+    position: fixed; inset: 0; z-index: 30; display: grid; place-items: center;
+    background: rgba(12,26,42,.55); backdrop-filter: blur(10px);
+    opacity: 0; visibility: hidden; transition: opacity .5s, visibility .5s; padding: 20px;
+  }
+  #over.show { opacity: 1; visibility: visible; }
+  .ov-card {
+    width: min(460px, 100%); border-radius: 26px; padding: 28px 26px 22px;
+    background: #fffdf9; box-shadow: 0 30px 80px rgba(0,0,0,.35);
+    transform: translateY(18px) scale(.96); transition: .5s cubic-bezier(.2,.9,.3,1.2);
+    position: relative; overflow: hidden;
+  }
+  #over.show .ov-card { transform: none; }
+  .ov-card::before { content: ''; position: absolute; inset: 0 0 auto 0; height: 6px; }
+  .ov-card.bad::before { background: linear-gradient(90deg, #7f1d1d, #dc2626); }
+  .ov-card.good::before { background: linear-gradient(90deg, #0e7490, #22c55e); }
+  .ov-tag { display: inline-block; font-size: 10px; font-weight: 900; letter-spacing: .22em; color: #94a3b8; margin-bottom: 10px; }
+  .ov-card h2 { font-size: 25px; font-weight: 900; color: #102a43; line-height: 1.3; }
+  .ov-card p { margin-top: 11px; font-size: 12.5px; line-height: 1.85; color: #5b7183; }
+  .ov-stats {
+    margin-top: 18px; padding: 14px 0; border-top: 1.5px dashed #e6eef5; border-bottom: 1.5px dashed #e6eef5;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center;
+  }
+  .ov-stats div span { display: block; font-size: 9px; font-weight: 800; letter-spacing: .12em; color: #9db2c4; }
+  .ov-stats div b { display: block; font-size: 16px; font-weight: 900; color: #16324a; margin-top: 3px; }
+  .ov-comment { margin-top: 14px; font-size: 12px; line-height: 1.8; color: #8a6a3f; background: #fdf7ea; border-radius: 12px; padding: 10px 13px; }
+  .ov-card .btn { width: 100%; margin-top: 16px; padding: 12px; font-size: 13.5px; }
+
+  /* ---------- 三界判定（结局卡里的去处分流） ---------- */
+  .ov-realm {
+    margin-top: 14px; border-radius: 14px; padding: 13px 14px 12px;
+    border: 1.5px solid #e4ecf3; background: linear-gradient(180deg, #f9fbfd, #f2f7fb);
+    animation: realmIn .55s cubic-bezier(.2,.9,.3,1.15) both;
+  }
+  @keyframes realmIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .ov-realm.difu { border-color: #ecd6d2; background: linear-gradient(180deg, #fdf8f6, #f9eeeb); }
+  .ov-realm.tiangong { border-color: #d9e7f3; background: linear-gradient(180deg, #f8fbfe, #eef6fc); }
+  .ov-realm-h { display: flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 900; letter-spacing: .16em; color: #7b8fa2; }
+  .ov-realm-h .dot { width: 7px; height: 7px; border-radius: 50%; background: #b9c8d6; flex: 0 0 auto; }
+  .ov-realm.difu .dot { background: #c0392b; box-shadow: 0 0 0 3px rgba(192,57,43,.13); }
+  .ov-realm.tiangong .dot { background: #c9a227; box-shadow: 0 0 0 3px rgba(201,162,39,.16); }
+  .ov-realm-h i { margin-left: auto; font-style: normal; font-size: 10px; font-weight: 800; color: #a9b8c6; letter-spacing: 0; }
+  .ov-realm p { margin-top: 8px; font-size: 12px; line-height: 1.8; color: #54707f; }
+  .ov-realm ul { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 5px; }
+  .ov-realm li { font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 99px; background: #fff; border: 1px solid #e3ebf2; color: #7a8fa0; }
+  .ov-realm li.evil { background: #fdf1ef; border-color: #f0d6d1; color: #a4483c; }
+  .ov-realm li.good { background: #f2f8f3; border-color: #d9ebdd; color: #3c7a4f; }
+  .ov-realm-btns { display: flex; gap: 8px; margin-top: 12px; }
+  .ov-realm-btns .btn { margin-top: 0; width: auto; flex: 1 1 0; padding: 10px; font-size: 12.5px; }
+  .ov-realm-btns .btn.stay { flex: 0 0 auto; width: auto; padding: 10px 13px; font-size: 11.5px; }
+  .ov-realm .go-difu { background: linear-gradient(180deg, #9a3327, #6d1d16); color: #ffeede; box-shadow: 0 3px 0 #4d130e; }
+  .ov-realm .go-tiangong { background: linear-gradient(180deg, #35749f, #1f5279); color: #eaf6ff; box-shadow: 0 3px 0 #16405f; }
+  .ov-realm.stay-put { opacity: .72; }
+
+
+  /* ---------- 界面会累：三级退化 ----------
+     ui-tired  疲惫：只有文字开始不稳，界面还撑着
+     ui-frayed 撑不住：圆角变钝、阴影消失、颜色褪去、点按迟半拍
+     ui-blank  都撑不住：你连自己还剩多少都看不清                    */
+  @keyframes uiFlicker {
+    0%, 91%, 100% { opacity: 1; }
+    92% { opacity: .58; }
+    93% { opacity: 1; }
+    95% { opacity: .72; }
+  }
+  @keyframes uiTremble {
+    0%, 85%, 100% { transform: translate(0, 0); }
+    87% { transform: translate(.4px, -.3px); }
+    89% { transform: translate(-.4px, .3px); }
+    91% { transform: translate(.3px, .2px); }
+    93% { transform: translate(0, 0); }
+  }
+
+  /* ① 疲惫 */
+  body.ui-tired .stat b { animation: uiFlicker 3.8s infinite; opacity: .88; }
+  body.ui-tired #weatherTip { opacity: .82; }
+
+  /* ② 撑不住：界面本身在垮 */
+  body.ui-frayed #hud {
+    border-radius: 6px; box-shadow: none !important;
+    border-color: rgba(255,255,255,.55) !important;
+  }
+  body.ui-frayed #panel { border-radius: 14px; border-width: 4px; border-color: #3d5063; background: #f6f8fa; }
+  body.ui-frayed #minimap { border-radius: 6px; }
+  body.ui-frayed #minimap,
+  body.ui-frayed #ticket { box-shadow: 0 1px 4px rgba(20,50,90,.08) !important; }
+  body.ui-frayed .opt {
+    border-radius: 6px; border-color: #dfe7ee; background: #fcfdfe;
+    box-shadow: none !important;
+  }
+  body.ui-frayed .opt:hover { transform: none; border-color: #cbd8e4; background: #fff; }
+  body.ui-frayed .opt .ot { color: #52697b; }
+  body.ui-frayed .btn { border-radius: 9px; box-shadow: 0 2px 0 #c2410c !important; filter: saturate(.5) brightness(1.05); }
+  body.ui-frayed .rp { border-radius: 3px; }
+  body.ui-frayed .stat b { color: #5f7181 !important; }
+  /* 危险值该红还是要红：褪色不能把警报一起褪掉 */
+  body.ui-frayed.low-stamina .stat[data-k="stamina"] b,
+  body.ui-frayed.low-spirit .stat[data-k="spirit"] b { color: #dc2626 !important; }
+  body.ui-frayed .stat .k { color: #a5b3bf; }
+  body.ui-frayed .stat .left { color: #b9b1a5; }
+  body.ui-frayed .track { background: #e9eef3; }
+  body.ui-frayed .track .fill { filter: saturate(.3) brightness(1.08); }
+  body.ui-frayed #hud,
+  body.ui-frayed #panel,
+  body.ui-frayed #minimap,
+  body.ui-frayed .opt { filter: saturate(.62) contrast(.96); }
+  body.ui-frayed #hero h1 { filter: drop-shadow(0 1.5px 0 #9a3412) saturate(.5) blur(.3px); }
+  body.ui-frayed .opt:active { transition-delay: .18s; transform: scale(.985); }
+  body.ui-frayed .btn:active { transition-delay: .18s; }
+  body.ui-frayed #pTitle,
+  body.ui-frayed .opt .ot { animation: uiTremble 3.4s infinite; }
+
+  /* ③ 都撑不住了：数字读不出来 */
+  body.ui-blank .stat b {
+    color: transparent !important; position: relative;
+    animation: uiFlicker 1.7s infinite;
+    text-shadow: none !important;
+  }
+  body.ui-blank .stat b::after {
+    content: "——"; position: absolute; left: 0; top: 0;
+    color: #93a3b1; letter-spacing: -.03em;
+  }
+  body.ui-blank .left { color: transparent !important; position: relative; }
+  body.ui-blank .left::after {
+    content: "——"; position: absolute; left: 0; top: 0; color: #a8b4bf;
+  }
+  body.ui-blank .track .fill { background: #c5d0da !important; }
+  body.ui-blank #hud { filter: saturate(.35); }
+  body.ui-blank #hero h1 { filter: drop-shadow(0 1.5px 0 #9a3412) saturate(.3) blur(.55px); }
+  body.ui-blank .opt .oc i { opacity: .55; }
+  body.ui-blank #weatherTip { opacity: .6; }
+
+  /* ---------- 体检报告 ---------- */
+  .rp {
+    width: min(520px, 100%); max-height: 88vh; overflow-y: auto;
+    background: #fefefb; border-radius: 6px; padding: 26px 26px 20px;
+    box-shadow: 0 30px 80px rgba(0,0,0,.42), inset 0 0 0 1px rgba(0,0,0,.05);
+    transform: translateY(-16px) rotate(-.4deg); transition: .55s cubic-bezier(.2,.9,.3,1.1);
+    position: relative;
+  }
+  #seasonCard.show .rp { transform: none; }
+  .rp::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px;
+    background: repeating-linear-gradient(90deg, #c0392b 0 14px, transparent 14px 22px);
+  }
+  .rp-hosp { font-size: 9px; letter-spacing: .22em; color: #9aa7b3; text-align: center; }
+  .rp-title {
+    text-align: center; font-size: 22px; font-weight: 900; letter-spacing: .3em;
+    color: #22303d; margin: 6px 0 12px; padding-bottom: 10px;
+    border-bottom: 2px solid #22303d;
+  }
+  .rp-meta {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    font-size: 10.5px; color: #7d8b98; margin-bottom: 4px;
+  }
+  .rp-meta b { color: #33414f; font-weight: 800; }
+  .rp-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 11.5px; }
+  .rp-table th {
+    font-size: 9px; letter-spacing: .16em; color: #94a2ae; font-weight: 800;
+    text-align: left; padding: 5px 4px; border-bottom: 1px solid #dfe6ec;
+  }
+  .rp-table th:nth-child(2) { text-align: center; }
+  .rp-table th:nth-child(3) { text-align: right; }
+  .rp-table td {
+    padding: 7px 4px; border-bottom: 1px dashed #e8eef3; color: #3d4d5c;
+  }
+  .rp-table td:nth-child(2) { text-align: center; font-weight: 800; font-family: ui-monospace, Menlo, monospace; }
+  .rp-table td:nth-child(3) { text-align: right; color: #a3b0bb; font-size: 10px; }
+  .rp-table tr.bad td:nth-child(2) { color: #c0392b; }
+  .rp-table tr.bad td:nth-child(2)::after { content: ' ↑'; font-size: 9px; }
+  .rp-advice { margin-top: 16px; padding: 11px 13px; background: #fbf6ea; border-left: 3px solid #d9a441; border-radius: 0 8px 8px 0; }
+  .rp-advice span { font-size: 9px; letter-spacing: .2em; color: #b78a3c; font-weight: 900; }
+  .rp-advice p { margin-top: 5px; font-size: 12px; line-height: 1.8; color: #5f5340; }
+  .rp-foot {
+    margin-top: 18px; display: flex; justify-content: space-between; align-items: flex-end;
+    font-size: 9.5px; color: #98a5b1; padding-top: 12px; border-top: 1px solid #e8eef3;
+  }
+  .rp-stamp {
+    display: inline-block; padding: 5px 10px; border: 1.5px solid rgba(192,57,43,.4);
+    color: rgba(192,57,43,.55); border-radius: 4px; font-size: 8.5px; letter-spacing: .12em;
+    transform: rotate(-6deg); font-weight: 900;
+  }
+  .rp-next {
+    margin-top: 12px; text-align: center; font-size: 10.5px; color: #8d9aa6;
+    letter-spacing: .06em;
+  }
+  .rp-next b { color: #c0392b; font-weight: 900; }
+
+  /* ---------- 老板来电 ---------- */
+  #call {
+    position: fixed; inset: 0; z-index: 36; display: grid; place-items: center;
+    background: rgba(8,18,30,.72); backdrop-filter: blur(14px);
+    opacity: 0; visibility: hidden; transition: opacity .35s, visibility .35s;
+    padding: 20px;
+  }
+  #call.show { opacity: 1; visibility: visible; }
+  .call-card {
+    width: min(330px, 100%); border-radius: 28px; padding: 26px 22px 22px;
+    background: linear-gradient(180deg, #1d2b3a, #16222f);
+    box-shadow: 0 30px 70px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.08);
+    text-align: center; position: relative;
+    animation: callShake 1.6s ease-in-out infinite;
+  }
+  @keyframes callShake {
+    0%, 92%, 100% { transform: translate(0,0); }
+    93% { transform: translate(-2px,1px); }
+    95% { transform: translate(2px,-1px); }
+    97% { transform: translate(-1px,-1px); }
+  }
+  .call-avatar {
+    width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 14px;
+    display: grid; place-items: center; font-size: 24px; font-weight: 900; color: #16222f;
+    background: linear-gradient(145deg, #ffd166, #f0a63a);
+    box-shadow: 0 0 0 0 rgba(255,209,102,.5);
+    animation: callPulse 1.6s infinite;
+  }
+  @keyframes callPulse {
+    0% { box-shadow: 0 0 0 0 rgba(255,209,102,.45); }
+    70% { box-shadow: 0 0 0 16px rgba(255,209,102,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,209,102,0); }
+  }
+  .call-from { font-size: 20px; font-weight: 900; color: #f4f8fb; letter-spacing: .04em; }
+  .call-sub { margin-top: 6px; font-size: 11px; color: #8ea3b5; letter-spacing: .18em; }
+  .call-actions { display: flex; gap: 12px; margin-top: 24px; }
+  .call-btn {
+    flex: 1; padding: 12px 0; border: none; border-radius: 999px; cursor: pointer;
+    font-family: inherit; font-size: 13.5px; font-weight: 900; letter-spacing: .06em;
+    transition: transform .12s, filter .15s;
+  }
+  .call-btn:active { transform: scale(.96); }
+  .call-btn.reject { background: #3a4a5a; color: #c7d6e3; }
+  .call-btn.accept { background: linear-gradient(180deg, #4ade80, #16a34a); color: #06281a; }
+  .call-btn:hover { filter: brightness(1.08); }
+
+  /* ---------- 轻量模式 ---------- */
+  .lite .jc-chroma { animation: none !important; }
+  .lite .pk-bg { animation: none !important; filter: blur(46px); }
+  .lite .jobcard { transition: transform .34s ease, opacity .3s; }
+  .lite #rollBtn:not([disabled]) { animation: none; }
+  .lite .call-card { animation: none; }
+  .lite .rp { transition: .3s; }
+
+  /* ---------- 手机地图小窗 ---------- */
+  #minimap {
+    position: fixed; top: 94px; right: 14px; z-index: 13;
+    width: 196px; padding: 10px 10px 8px; border-radius: 18px;
+    background: rgba(255,255,255,.78);
+    backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5);
+    border: 1.5px solid rgba(255,255,255,.9);
+    box-shadow: 0 16px 38px rgba(20,50,85,.18), inset 0 0 0 1.5px rgba(255,255,255,.85);
+    opacity: 0; transform: translateY(-10px) scale(.95); pointer-events: none;
+    transition: opacity .28s, transform .32s cubic-bezier(.2,.9,.3,1.15);
+  }
+  #minimap.show { opacity: 1; transform: none; pointer-events: auto; }
+  #mmCanvas { display: block; width: 176px; height: 176px; border-radius: 12px; background: rgba(244,250,255,.72); }
+  .mm-bar {
+    display: flex; align-items: baseline; gap: 6px; margin-top: 8px;
+    font-size: 10.5px; font-weight: 800; color: #55738a;
+  }
+  .mm-bar b {
+    font-size: 12px; color: #fff; padding: 2px 7px; border-radius: 6px;
+    background: #6fbf5a;
+  }
+  .mm-bar i { margin-left: auto; font-style: normal; color: #c2410c; font-variant-numeric: tabular-nums; }
+  .mm-foot {
+    margin-top: 5px; font-size: 9.5px; letter-spacing: .06em;
+    color: #7f9cb2; text-align: center;
+  }
+  @media (max-width: 760px) {
+    #minimap { width: 158px; top: 176px; right: 10px; padding: 8px 8px 6px; }
+    #mmCanvas { width: 142px; height: 142px; }
+    .mm-bar { font-size: 10px; }
+    .mm-bar b { font-size: 11px; }
+  }
+
+  /* ---------- 加载 ---------- */
+  #loading {
+    position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+    background: linear-gradient(180deg, #a9dcff, #eef9ff 60%, #fdf3dd);
+    transition: opacity .6s, visibility .6s;
+  }
+  #loading.hide { opacity: 0; visibility: hidden; }
+  #loading .wrap { text-align: center; }
+  #loading .ring {
+    width: 54px; height: 54px; margin: 0 auto 18px; border-radius: 50%;
+    border: 5px solid rgba(255,255,255,.85); border-top-color: #f97316;
+    animation: spin 1s linear infinite; box-shadow: 0 6px 20px rgba(249,115,22,.2);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading p { font-size: 13px; font-weight: 700; letter-spacing: .18em; color: #4d7ea6; }
+  #loading .err { margin-top: 14px; font-size: 12px; color: #d94b3a; letter-spacing: 0; max-width: 300px; line-height: 1.8; }
+  #loading .err .retry {
+    display: inline-block; margin-top: 8px; padding: 7px 16px; border-radius: 999px;
+    background: #f97316; color: #fff; text-decoration: none; font-weight: 900; font-size: 11.5px;
+    letter-spacing: .1em; box-shadow: 0 6px 16px rgba(249,115,22,.3);
+  }
+  #loading .err .retry:hover { filter: brightness(1.08); }
+  .failbox { text-align: center; }
+  .failbox b { display: block; font-size: 15px; color: #e05a3a; letter-spacing: .04em; margin-bottom: 9px; }
+  .failbox p { font-size: 12px; line-height: 1.85; color: #b4634f; margin: 0; }
+  .failbox p.how {
+    margin-top: 11px; padding: 9px 12px; border-radius: 12px;
+    background: rgba(249,115,22,.1); border: 1px solid rgba(249,115,22,.22);
+  }
+  .failbox p.how b { display: inline; font-size: 12.5px; color: #c2410c; margin: 0; letter-spacing: 0; }
+  .failbox small {
+    display: block; margin-top: 10px; font-size: 9.5px; color: #a08a80;
+    letter-spacing: .02em; word-break: break-all;
+  }
+
+  /* ---------- 响应式 ---------- */
+  @media (max-width: 1180px) { #panel { width: 320px; } .stat { width: 74px; } }
+  @media (max-height: 760px) and (min-width: 761px) {
+    #panel { top: 142px; max-height: calc(100vh - 236px); }
+    #pTitle { font-size: 16px; }
+    .opt { padding: 8px 12px; margin-bottom: 6px; }
+  }
+  @media (max-width: 760px) {
+    #hero {
+      left: 12px; transform: none; text-align: left;
+      max-width: calc(100vw - 170px);
+    }
+    #hero h1 { font-size: 17px; letter-spacing: .06em; }
+    #hero .sub { font-size: 9.5px; letter-spacing: .16em; }
+    #hud { top: 56px; padding: 7px 9px 8px; border-radius: 15px; }
+    .stat { width: 64px; padding: 0 5px; }
+    .stat .k { font-size: 10px; letter-spacing: .06em; }
+    .stat b { font-size: 14px; }
+    .left { font-size: 8px; }
+    #weatherTip { top: 146px; font-size: 10.5px; }
+    #panel { bottom: 72px; width: calc(100% - 22px); max-height: 54vh; border-radius: 26px; border-width: 5px; }
+    #panel.show { transform: translateX(-50%) translateY(0) scale(1); }
+    #pTitle { font-size: 15.5px; }
+    #pDesc { font-size: 12px; }
+    .opt { padding: 8px 11px; margin-bottom: 6px; }
+    .btn { padding: 9px 13px; font-size: 12px; }
+    .dice-box { width: 34px; height: 34px; padding: 5px; }
+    #toast { top: 196px; font-size: 12px; }
+    #ticket { left: 10px; bottom: 138px; width: 190px; font-size: 10px; padding: 11px 12px 9px; }
+    .pick-stage { height: 366px; margin-top: 10px; perspective: 1000px; }
+    .jobcard { width: 244px; height: 330px; margin: -165px 0 0 -122px; }
+    .jc-in { padding: 15px 15px 13px; }
+    .ji { width: 40px; height: 40px; font-size: 18px; border-radius: 12px; }
+    .jc-money { font-size: 9.5px; padding: 4px 8px; }
+    .jc-name { font-size: 21px; margin-top: 11px; }
+    .jc-tag { font-size: 10px; }
+    .jc-desc { font-size: 10.5px; line-height: 1.7; margin-top: 9px; }
+    .jc-stats { margin-top: 10px; gap: 5px; }
+    .jc-perk { font-size: 9.5px; line-height: 1.6; padding: 7px 9px; border-radius: 10px; }
+    .pick-nav { width: 34px; height: 34px; font-size: 17px; }
+    .pick-nav.prev { left: 0; }
+    .pick-nav.next { right: 0; }
+    .pk-switch { right: 50%; top: -34px; transform: translateX(50%); }
+    .pk-bg { filter: blur(44px); opacity: .5; }
+    #pick.sk-glass .jc-in { backdrop-filter: none; }
+    .jobcard { transition: transform .45s cubic-bezier(.2,.9,.28,1), opacity .4s; }
+    .pick-title { margin-top: 26px; }
+    .pick-go { padding: 11px 28px; font-size: 13px; }
+    .jd { display: none; }
+    .ov-card { padding: 22px 18px 18px; }
+    .ov-card h2 { font-size: 21px; }
+  }
+</style>
+</head>
+<body>
+  <div id="app"></div>
+  <canvas id="weatherFx"></canvas>
+
+  <header id="hero">
+    <h1>人生就是一场游戏</h1>
+    <div class="sub">一年四季 · 四个关卡 · 三百六十天</div>
+  </header>
+
+  <div id="hud">
+    <div class="topline">
+      <span id="seasonTag">春</span>
+      <span class="days">第 <b id="dayNum">1</b> / 90 天</span>
+      <span id="weatherTag">☀ 晴</span>
+    </div>
+    <div class="stats">
+      <div class="stat" data-k="money"><span class="k">钱</span><b id="vMoney">¥0</b><span class="left" id="moneyDays">—</span></div>
+      <div class="stat" data-k="stamina"><span class="k">体力</span><b id="vStamina">100</b>
+        <span class="track"><i class="fill sta" id="bStamina" style="width:100%"></i></span></div>
+      <div class="stat" data-k="spirit"><span class="k">精神</span><b id="vSpirit">100</b>
+        <span class="track"><i class="fill spirit" id="bSpirit" style="width:100%"></i></span></div>
+      <div class="stat" data-k="face"><span class="k">体面</span><b id="vFace">60</b>
+        <span class="track"><i class="fill face" id="bFace" style="width:60%"></i></span></div>
+    </div>
+  </div>
+
+  <div id="weatherTip">出门看看天，再决定今天怎么过。</div>
+
+  <div id="panel">
+    <div class="pstatus"><span id="pClock">春 · 01</span><span class="bat" id="pBat">▮ 体力 100%</span></div>
+    <div class="pbar" id="pBar"></div>
+    <div class="phead">
+      <span class="pav" id="pAv">?</span>
+      <span class="pwho"><b id="pFrom">—</b><i class="pchan" id="pChan"></i></span>
+      <span class="pstate" id="pStat"></span>
+    </div>
+    <div class="pmeta">
+      <span class="psite" id="pSite">春季 · 第 1 天</span>
+      <span class="pjob" id="pJob">☀ 晴</span>
+    </div>
+    <div class="pbody">
+      <h3 id="pTitle">—</h3>
+      <p id="pDesc">—</p>
+      <div class="pfeed" id="pFeed"></div>
+      <div class="popts" id="pOpts"></div>
+    </div>
+  </div>
+
+  <div id="dock">
+    <div class="dice-box" id="diceBox"></div>
+    <button class="btn" id="rollBtn" disabled>掷骰子</button>
+    <button class="btn ghost" id="moonBtn">看会儿月亮</button>
+    <button class="btn ghost" id="mapBtn">地图 M</button>
+  </div>
+
+  <div id="minimap">
+    <canvas id="mmCanvas"></canvas>
+    <div class="mm-bar"><b id="mmSeason">春</b><span id="mmDay">第 1 天</span><i id="mmLeft">剩 89</i></div>
+    <div class="mm-foot">↑ 为前进方向</div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div id="ticket">
+    <div class="tk-head">流 水 账</div>
+    <div class="tk-sub" id="tkSub">第 1 - 1 天</div>
+    <div class="tk-hr"></div>
+    <div class="tk-row"><span>零工收入</span><b class="in" id="tkIn">+0</b></div>
+    <div class="tk-row"><span>吃饭通勤</span><b class="out" id="tkOut">-0</b></div>
+    <div class="tk-hr"></div>
+    <div class="tk-row total"><span>本次结余</span><b id="tkNet">0</b></div>
+    <div class="tk-row"><span>累计</span><b id="tkTotal">¥0</b></div>
+    <div class="tk-foot">谢谢惠顾，明天见</div>
+  </div>
+
+  <div id="pick" class="sk-flow">
+    <div class="pk-bg"></div>
+    <div class="pk-grain"></div>
+    <div class="pk-vig"></div>
+    <div class="pick-in">
+      <div class="pk-switch" id="pkSwitch">
+        <button data-sk="sk-flow" class="on">流光</button>
+        <button data-sk="sk-glass">琉璃</button>
+        <button data-sk="sk-neon">霓虹</button>
+      </div>
+      <div class="pick-title">
+        <h2>先选一个身份</h2>
+        <p>每个人开局都不一样。选完就改不了了。</p>
+      </div>
+      <div class="pick-stage" id="pickStage">
+        <div id="jobList"></div>
+        <button class="pick-nav prev" id="pickPrev" aria-label="上一个">&#8249;</button>
+        <button class="pick-nav next" id="pickNext" aria-label="下一个">&#8250;</button>
+      </div>
+      <div class="pick-dots" id="pickDots"></div>
+    </div>
+  </div>
+
+  <div id="seasonCard">
+    <div class="rp">
+      <div class="rp-hosp">市 第 三 人 民 医 院 · 健 康 体 检 中 心</div>
+      <div class="rp-title">体检报告单</div>
+      <div class="rp-meta"><span>姓名：<b>李 某</b></span><span>性别：男</span><span>年龄：<b id="rpAge">27</b></span></div>
+      <div class="rp-meta"><span>体检日期：<b id="rpDate">—</b></span><span>编号：<b id="rpNo">—</b></span></div>
+      <table class="rp-table">
+        <thead><tr><th>项目</th><th>结果</th><th>参考值</th></tr></thead>
+        <tbody id="rpBody"></tbody>
+      </table>
+      <div class="rp-advice"><span>医 生 建 议</span><p id="rpAdvice">—</p></div>
+      <div class="rp-foot">
+        <span>体检医师：<b>——</b></span>
+        <span class="rp-stamp">体检专用章</span>
+      </div>
+      <div class="rp-next" id="rpNext"></div>
+    </div>
+  </div>
+
+  <div id="call">
+    <div class="call-card">
+      <div class="call-avatar">王</div>
+      <div class="call-from">王主管</div>
+      <div class="call-sub">来 电 中 …</div>
+      <div class="call-actions">
+        <button class="call-btn reject" id="callReject">拒接</button>
+        <button class="call-btn accept" id="callAccept">接听</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="over">
+    <div class="ov-card" id="ovCard">
+      <div class="ov-tag" id="ovTag">结局</div>
+      <h2 id="ovTitle">—</h2>
+      <p id="ovText">—</p>
+      <div class="ov-stats">
+        <div><span>撑过</span><b id="ovDays">0</b></div>
+        <div><span>剩下</span><b id="ovMoney">¥0</b></div>
+        <div><span>还剩自己</span><b id="ovSpirit">0%</b></div>
+        <div><span>低过头</span><b id="ovDignity">0</b></div>
+      </div>
+      <div class="ov-comment" id="ovComment">—</div>
+      <button class="btn" id="againBtn">再来一次</button>
+    </div>
+  </div>
+
+  <div id="loading">
+    <div class="wrap">
+      <div class="ring"></div>
+      <p>正在搭建这一趟人生…</p>
+      <div class="err" id="loadErr"></div>
+    </div>
+  </div>
+
+<!-- 游戏源码：已由原先的单行压缩代码拆分为 js/life/ 下的模块，按依赖顺序同步加载 -->
+<script src="vendor/three.bundle.js"></script>
+<script src="js/life/05-sfx.js"></script>
+<script src="js/life/10-gfx-utils.js"></script>
+<script src="js/life/20-env.js"></script>
+<script src="js/life/25-stage.js"></script>
+<script src="js/life/30-landmarks.js"></script>
+<script src="js/life/40-data-jobs.js"></script>
+<script src="js/life/50-data-season.js"></script>
+<script src="js/life/55-data-calls.js"></script>
+<script src="js/life/60-data-events.js"></script>
+<script src="js/life/61-events-seasons.js"></script>
+<script src="js/life/62-events-job.js"></script>
+<script src="js/life/63-events-fate.js"></script>
+<script src="js/life/64-events-fate-job.js"></script>
+<script src="js/life/66-events-retribution.js"></script>
+<script src="js/life/65-weather-tips.js"></script>
+<script src="js/life/70-board-config.js"></script>
+<script src="js/life/75-board.js"></script>
+<script src="js/life/76-tile-icons.js"></script>
+<script src="js/life/77-plaza.js"></script>
+<script src="js/life/80-daynight.js"></script>
+<script src="js/life/81-pawn.js"></script>
+<script src="js/life/82-state-hud.js"></script>
+<script src="js/life/85-weather-fx.js"></script>
+<script src="js/life/86-dice.js"></script>
+<script src="js/life/87-turn.js"></script>
+<script src="js/life/88-minimap.js"></script>
+<script src="js/life/89-phone.js"></script>
+<script src="js/life/90-season-end.js"></script>
+<script src="js/life/91-jobpick.js"></script>
+<script src="js/life/92-loop.js"></script>
+<script src="js/life/93-boot.js"></script>
+
+<!-- ===== 联网层（后端不可达时自动降级为单机，不影响本体） ===== -->
+<script src="js/net/track.js"></script>
+<script src="js/net/api.js"></script>
+<script src="js/net/session.js"></script>
+<script src="js/net/sync.js"></script>
+<script src="js/life/94-online.js"></script>
+<script src="js/life/95-fate-extra.js"></script>
+<script src="js/life/96-run-mod.js"></script>
+<script src="js/life/97-event-veil.js"></script>
+
+<script>
+  /* 加载看门狗：只在页面可见时才判定失败，避免后台标签误报 */
+  (function () {
+    var LIMIT = 20000, timer = null;
+
+    function fail(html) {
+      var e = document.getElementById('loadErr');
+      if (!e) return;
+      e.innerHTML = html;
+      var ring = document.querySelector('#loading .ring');
+      if (ring) ring.style.animation = 'none';
+      var lp = document.querySelector('#loading p');
+      if (lp) lp.textContent = '页面没能打开';
+    }
+    var RETRY = '<a href="javascript:location.reload()" class="retry">点击重新加载</a>';
+
+    function tick() {
+      if (window.__READY__ || window.__LOAD_FAIL) { return; }
+      fail('加载时间过长，可能是在后台标签页打开的。<br>' + RETRY);
+    }
+
+    function start() {
+      clearTimeout(timer);
+      if (document.hidden) { return; }   /* 后台时 rAF 被暂停，不计时 */
+      timer = setTimeout(tick, LIMIT);
+    }
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { clearTimeout(timer); }
+      else {
+        start();
+        if (!window.__READY__ && window.__forceRender) window.__forceRender();
+      }
+    });
+
+    /* 脚本报错就直接说明原因，不让用户干等 */
+    window.addEventListener('error', function (ev) {
+      if (window.__READY__ || window.__LOAD_FAIL) { return; }
+      window.__LOAD_FAIL = 'js';
+      fail('出错了：' + (ev.message || '未知错误') + '<br>' + RETRY);
+    });
+
+    start();
+  })();
+</script>
+</body>
+</html>

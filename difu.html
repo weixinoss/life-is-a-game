@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>幽冥地府 · 三界漫游</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%235c0d08'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='%23e8c86a' font-family='serif'%3E幽%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<!-- 顶部题名 -->
+<header id="topbar">
+  <div class="brand">
+    <span class="seal">幽</span>
+    <div class="tt">
+      <h1>幽冥地府 · 三界漫游</h1>
+      <p id="crumb">十殿阎罗 · 十八层地狱 · 六道轮回</p>
+    </div>
+  </div>
+  <div class="tools">
+    <div class="slider"><span>灯</span><input id="litRange" type="range" min="70" max="240" value="135"></div>
+    <div class="slider"><span>雾</span><input id="fogRange" type="range" min="10" max="60" value="26"></div>
+    <button id="btnTour" class="tool" title="自动引路">自动引路</button>
+    <button id="btnSound" class="tool" title="幽冥之声">幽冥之声</button>
+    <button id="btnHelp" class="tool" title="操作说明">?</button>
+  </div>
+</header>
+
+<!-- 左侧冥途导航 -->
+<nav id="nav">
+  <div class="nav-title">冥<br>途</div>
+  <ul id="navList"></ul>
+</nav>
+
+<!-- 悬停提示 -->
+<div id="hoverTip"></div>
+<div id="crosshair"><span></span></div>
+
+<!-- 右侧典故面板 -->
+<aside id="panel" class="hidden">
+  <button id="pClose" class="close">×</button>
+  <div class="p-head">
+    <h2 id="pTitle"></h2>
+    <p id="pSub"></p>
+  </div>
+  <div class="p-body" id="pBody"></div>
+  <blockquote id="pQuote"></blockquote>
+  <div class="p-actions" id="pActions"></div>
+</aside>
+
+<!-- 底部提示 -->
+<footer id="hud">
+  <span id="hudKeys"><span class="k">拖动</span>转视　<span class="k">W A S D</span>行走　<span class="k">空格/C</span>升降　<span class="k">滚轮</span>进退　<span class="k">点击</span>问典</span>
+  <span class="stat">已阅典故 <b id="seenCount">0</b> / <b id="seenTotal">0</b></span>
+</footer>
+
+<!-- 移动端行走键 -->
+<div id="touchPad">
+  <button data-k=" ">升</button>
+  <button data-k="w">前</button>
+  <button data-k="c">降</button>
+  <button data-k="s">后</button>
+</div>
+
+<!-- 操作说明 -->
+<div id="help" class="overlay hidden">
+  <div class="scroll">
+    <h3>游冥须知</h3>
+    <ul>
+      <li><b>转视</b>：按住鼠标左键拖动（触屏单指滑动）</li>
+      <li><b>行走</b>：W / A / S / D 或方向键；Shift 加速</li>
+      <li><b>升降</b>：空格上升，C 下降</li>
+      <li><b>进退</b>：鼠标滚轮</li>
+      <li><b>问典</b>：点击场景中发光的对象，可查看典故</li>
+      <li><b>换景</b>：点击左侧「冥途」，或按数字键 1–7</li>
+      <li><b>静观</b>：H 键隐藏界面；Esc 关闭面板</li>
+    </ul>
+    <p class="tip">提示：一殿孽镜台、三生石、孟婆汤与六道轮盘皆可亲手一试。</p>
+    <button class="btn" data-close="help">知道了</button>
+  </div>
+</div>
+
+<!-- 仪式互动层 -->
+<div id="ritual" class="overlay hidden">
+  <div class="scroll">
+    <h3 id="rTitle"></h3>
+    <p id="rDesc"></p>
+    <div id="rInputWrap" class="hidden">
+      <input id="rInput" type="text" maxlength="12" placeholder="姓名">
+    </div>
+    <div id="rResult" class="hidden"></div>
+    <div class="r-btns">
+      <button id="rBtn" class="btn">开始</button>
+      <button class="btn ghost" data-close="ritual">退下</button>
+    </div>
+  </div>
+</div>
+
+<!-- 特效层 -->
+<div id="flash"></div>
+<div id="toast"></div>
+
+<!-- 入场 -->
+<div id="intro">
+  <div class="intro-inner">
+    <div class="gate-word">幽<br>冥</div>
+    <h1>幽冥地府 · 三界漫游</h1>
+    <p class="intro-sub">鬼门关 · 黄泉路 · 忘川奈何 · 孽镜台 · 阎罗殿 · 十八层地狱 · 六道轮回</p>
+    <p class="intro-desc">人死为鬼，鬼入幽冥。此地有十殿阎罗掌审判、十八层地狱司刑罚、转轮王定轮回。<br>今开鬼门一隙，许阳世之人游历其间——但看，莫惊。</p>
+    <button id="enter" class="btn big">入　幽　冥</button>
+    <p class="intro-tip">进入后开启声音，可闻阴风与地脉之鸣</p>
+  </div>
+  <div class="intro-vignette"></div>
+</div>
+
+<div id="loading"><span>正在开启鬼门关…</span></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/builders.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/main.js"></script>
+<script src="js/net/track.js"></script>
+<script src="js/net/realm-gate.js"></script>
+<script src="js/net/realm-trial.js"></script>
+</body>
+</html>

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>天庭漫游 · Heavenly Court Roam</title>
+<style>
+  :root{
+    --gold:#e9c46a;
+    --gold-soft:#f4d58d;
+    --ink:#0c0a14;
+    --panel:rgba(18,14,28,0.55);
+    --panel-solid:rgba(18,14,28,0.82);
+    --text:#f3ecdd;
+    --text-dim:#b9b0a0;
+    --accent:#7fd0ff;
+    --danger:#ff6b6b;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;background:#05040a;font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC","Segoe UI",system-ui,sans-serif;color:var(--text);}
+  #app{position:fixed;inset:0;}
+  canvas{display:block;}
+
+  /* ---------- Overlays ---------- */
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:50;
+    background:radial-gradient(circle at 50% 35%,rgba(40,30,70,0.85),rgba(5,4,10,0.96));backdrop-filter:blur(6px);}
+  .overlay.hidden{display:none;}
+
+  .loading-box{width:min(82vw,420px);text-align:center;}
+  .loading-title{font-size:22px;letter-spacing:4px;color:var(--gold-soft);margin-bottom:18px;font-weight:600;}
+  .progress{height:8px;width:100%;border-radius:99px;background:rgba(255,255,255,0.12);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(233,196,106,0.25);}
+  #progress-bar{height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#e9c46a,#ffd97a,#fff1c4);transition:width .25s ease;box-shadow:0 0 12px rgba(233,196,106,0.7);}
+  #progress-text{margin-top:10px;font-size:13px;color:var(--text-dim);letter-spacing:1px;}
+  .loading-sub{margin-top:14px;font-size:13px;color:var(--text-dim);opacity:.85;}
+
+  .error-box{width:min(84vw,420px);text-align:center;background:var(--panel-solid);border:1px solid rgba(255,107,107,0.35);border-radius:18px;padding:30px 26px;box-shadow:0 20px 60px rgba(0,0,0,0.5);}
+  .error-icon{font-size:42px;color:var(--danger);margin-bottom:8px;}
+  .error-title{font-size:20px;color:#fff;margin-bottom:10px;letter-spacing:1px;}
+  .error-msg{font-size:14px;color:var(--text-dim);line-height:1.6;margin-bottom:22px;}
+
+  .btn{appearance:none;border:1px solid rgba(233,196,106,0.45);background:linear-gradient(180deg,rgba(233,196,106,0.18),rgba(233,196,106,0.06));color:var(--gold-soft);
+    padding:10px 18px;border-radius:12px;font-size:14px;cursor:pointer;letter-spacing:1px;transition:.2s;backdrop-filter:blur(8px);}
+  .btn:hover{background:rgba(233,196,106,0.28);color:#fff;}
+  .btn:active{transform:scale(.97);}
+  .btn.active{background:linear-gradient(180deg,rgba(127,208,255,0.30),rgba(127,208,255,0.10));border-color:rgba(127,208,255,0.5);color:#eaf7ff;}
+
+  /* ---------- Top bar ---------- */
+  #topbar{position:fixed;top:0;left:0;right:0;z-index:30;display:flex;align-items:center;justify-content:space-between;
+    padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));
+    background:linear-gradient(180deg,rgba(8,6,14,0.7),rgba(8,6,14,0));pointer-events:none;}
+  #topbar>*{pointer-events:auto;}
+  .brand{display:flex;flex-direction:column;line-height:1.05;}
+  .brand-zh{font-size:20px;font-weight:700;letter-spacing:6px;color:var(--gold-soft);text-shadow:0 0 14px rgba(233,196,106,0.5);}
+  .brand-en{font-size:10px;letter-spacing:3px;color:var(--text-dim);text-transform:uppercase;}
+  .top-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
+
+  /* ---------- Landmark panel ---------- */
+  #panel{position:fixed;left:16px;top:74px;z-index:25;width:230px;max-height:calc(100vh - 96px);
+    background:var(--panel);border:1px solid rgba(233,196,106,0.22);border-radius:16px;backdrop-filter:blur(14px);
+    box-shadow:0 14px 40px rgba(0,0,0,0.4);display:flex;flex-direction:column;overflow:hidden;transition:transform .3s ease;}
+  .panel-title{font-size:13px;letter-spacing:3px;color:var(--gold-soft);padding:14px 16px 10px;border-bottom:1px solid rgba(233,196,106,0.18);}
+  #landmark-list{overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;}
+  #landmark-list::-webkit-scrollbar{width:6px;}
+  #landmark-list::-webkit-scrollbar-thumb{background:rgba(233,196,106,0.35);border-radius:99px;}
+  .lm-btn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px solid transparent;background:rgba(255,255,255,0.04);
+    color:var(--text);padding:9px 11px;border-radius:11px;cursor:pointer;font-size:13px;transition:.18s;}
+  .lm-btn:hover{background:rgba(233,196,106,0.14);border-color:rgba(233,196,106,0.3);}
+  .lm-btn .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 8px currentColor;}
+  .lm-btn .lm-zh{font-weight:600;}
+  .lm-btn .lm-en{font-size:10px;color:var(--text-dim);letter-spacing:.5px;}
+
+  /* ---------- Info card ---------- */
+  #info-card{position:fixed;right:16px;bottom:16px;z-index:28;width:min(86vw,320px);
+    background:var(--panel-solid);border:1px solid rgba(233,196,106,0.28);border-radius:16px;padding:16px 18px 18px;
+    backdrop-filter:blur(14px);box-shadow:0 18px 50px rgba(0,0,0,0.5);transition:opacity .3s,transform .3s;}
+  #info-card.hidden{opacity:0;transform:translateY(20px);pointer-events:none;}
+  #info-close{position:absolute;top:8px;right:10px;border:none;background:none;color:var(--text-dim);font-size:20px;cursor:pointer;line-height:1;}
+  #info-name{font-size:19px;font-weight:700;color:var(--gold-soft);letter-spacing:2px;margin-bottom:4px;}
+  #info-name .en{display:block;font-size:11px;color:var(--text-dim);letter-spacing:2px;font-weight:400;margin-top:2px;text-transform:uppercase;}
+  #info-desc{font-size:13px;line-height:1.7;color:var(--text);opacity:.92;}
+
+  /* ---------- Hint ---------- */
+  #hint{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:20;
+    font-size:12px;color:var(--text-dim);background:rgba(8,6,14,0.5);padding:7px 14px;border-radius:99px;
+    backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.08);white-space:nowrap;
+    transition:opacity .4s;}
+  #hint.hidden{opacity:0;}
+
+  /* ---------- Mobile ---------- */
+  #panel-toggle{display:none;}
+  @media (max-width:720px){
+    .brand-zh{font-size:17px;letter-spacing:4px;}
+    #panel{top:auto;bottom:0;left:0;right:0;width:100%;max-height:46vh;border-radius:18px 18px 0 0;
+      transform:translateY(calc(100% - 0px));}
+    #panel.open{transform:translateY(0);}
+    #panel-toggle{display:flex;position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:26;align-items:center;gap:6px;}
+    #info-card{right:8px;left:8px;width:auto;bottom:calc(46vh + 12px);}
+    #hint{bottom:auto;top:70px;font-size:11px;}
+    .top-actions .btn{padding:8px 12px;font-size:12px;}
+  }
+  /* ---------- Beast bestiary panel ---------- */
+  #beast-panel{position:fixed;right:16px;top:74px;z-index:25;width:224px;max-height:calc(100vh - 96px);
+    background:var(--panel);border:1px solid rgba(233,196,106,0.22);border-radius:16px;backdrop-filter:blur(14px);
+    box-shadow:0 14px 40px rgba(0,0,0,0.4);display:flex;flex-direction:column;overflow:hidden;
+    transition:opacity .3s,transform .3s;}
+  #beast-list{overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px;}
+  #beast-panel.hidden{opacity:0;transform:translateY(20px);pointer-events:none;}
+  #beast-list::-webkit-scrollbar{width:6px;}
+  #beast-list::-webkit-scrollbar-thumb{background:rgba(233,196,106,0.35);border-radius:99px;}
+  .beast-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .beast-name{flex:1;min-width:96px;background:rgba(255,255,255,0.04);border:1px solid transparent;color:var(--text);
+    padding:8px 10px;border-radius:10px;cursor:pointer;font-size:13px;text-align:left;transition:.18s;}
+  .beast-name:hover{background:rgba(233,196,106,0.14);border-color:rgba(233,196,106,0.3);}
+  .beast-eye,.beast-follow{padding:6px 10px;font-size:12px;border-radius:9px;border:1px solid rgba(233,196,106,0.3);
+    background:rgba(233,196,106,0.10);color:var(--gold-soft);cursor:pointer;transition:.18s;}
+  .beast-eye.off{opacity:0.45;}
+  .beast-follow.active{background:rgba(127,208,255,0.25);border-color:rgba(127,208,255,0.55);color:#eaf7ff;}
+  #beast-toggle{display:none;}
+
+  @media (max-width:720px){
+    #beast-panel{top:auto;bottom:0;left:0;right:0;width:100%;max-height:46vh;border-radius:18px 18px 0 0;
+      transform:translateY(100%);opacity:0;pointer-events:none;}
+    #beast-panel.open{transform:translateY(0);opacity:1;pointer-events:auto;}
+    #beast-toggle{display:flex;position:fixed;right:14px;bottom:14px;z-index:26;align-items:center;gap:6px;}
+    #panel-toggle{bottom:14px;}
+    #beast-btn{display:none;}
+  }
+
+  /* ---------- 仙箓册（收集进度） ---------- */
+  #quest-btn{letter-spacing:1px;}
+  #quest-btn.full{border-color:rgba(127,208,255,.65);color:#eaf7ff;background:linear-gradient(180deg,rgba(127,208,255,.26),rgba(127,208,255,.08));}
+  #quest-count{font-variant-numeric:tabular-nums;}
+  #quest-panel{position:fixed;left:50%;top:50%;z-index:46;width:min(90vw,420px);
+    transform:translate(-50%,-50%) scale(.96);opacity:0;pointer-events:none;
+    background:var(--panel-solid);border:1px solid rgba(233,196,106,.34);border-radius:18px;
+    padding:20px 20px 16px;backdrop-filter:blur(16px);box-shadow:0 24px 70px rgba(0,0,0,.62);
+    transition:opacity .26s ease,transform .26s ease;}
+  #quest-panel.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1);}
+  #quest-close{position:absolute;top:10px;right:12px;border:none;background:none;color:var(--text-dim);font-size:20px;cursor:pointer;line-height:1;}
+  .qp-title{font-size:16px;font-weight:700;letter-spacing:3px;color:var(--gold-soft);display:flex;align-items:center;gap:8px;}
+  .qp-sub{font-size:12px;color:var(--text-dim);margin:6px 0 14px;line-height:1.6;}
+  .qp-banner{display:none;margin:0 0 12px;padding:10px 12px;border-radius:12px;font-size:12px;line-height:1.6;
+    background:linear-gradient(180deg,rgba(233,196,106,.22),rgba(233,196,106,.06));
+    border:1px solid rgba(233,196,106,.45);color:var(--gold-soft);letter-spacing:1px;}
+  #quest-panel.done .qp-banner{display:block;}
+  .slip-row{display:flex;gap:11px;align-items:flex-start;padding:11px;border-radius:13px;margin-bottom:8px;
+    background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);transition:.2s;}
+  .slip-row.on{background:rgba(127,208,255,.10);border-color:rgba(127,208,255,.42);}
+  .slip-ico{width:20px;height:28px;border-radius:3px;flex:0 0 auto;margin-top:2px;position:relative;
+    background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.05));border:1px solid rgba(255,255,255,.16);}
+  .slip-row.on .slip-ico{background:linear-gradient(180deg,#d9f5ea,#2f8f6f);border-color:rgba(159,225,203,.85);
+    box-shadow:0 0 12px rgba(159,225,203,.55);}
+  .slip-ico::after{content:"";position:absolute;left:50%;top:6px;width:1px;height:14px;background:rgba(0,0,0,.28);transform:translateX(-50%);}
+  .slip-row.on .slip-ico::after{background:rgba(255,255,255,.42);}
+  .slip-main{flex:1;min-width:0;}
+  .slip-name{font-size:13px;font-weight:600;letter-spacing:1px;color:var(--text);}
+  .slip-tag{font-size:10px;color:var(--text-dim);letter-spacing:1px;margin-left:6px;}
+  .slip-desc{font-size:11.5px;line-height:1.65;color:var(--text-dim);margin-top:4px;}
+  .slip-row.off .slip-desc{opacity:.6;filter:blur(.8px);}
+  .qp-foot{display:flex;justify-content:flex-end;margin-top:6px;}
+  #quest-reset{font-size:12px;padding:7px 12px;opacity:.8;}
+
+  /* ---------- 提示条 / 浮层消息 ---------- */
+  #prompt{position:fixed;left:50%;bottom:56px;z-index:22;transform:translateX(-50%) translateY(6px);
+    padding:9px 18px;border-radius:99px;background:rgba(8,6,14,.66);border:1px solid rgba(127,208,255,.38);
+    color:#eaf7ff;font-size:13px;letter-spacing:1px;backdrop-filter:blur(8px);white-space:nowrap;
+    opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;}
+  #prompt.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #prompt b{color:var(--gold-soft);font-weight:600;}
+  #toast{position:fixed;left:50%;top:70px;z-index:47;transform:translateX(-50%) translateY(-10px);
+    padding:10px 18px;border-radius:99px;background:rgba(12,10,20,.9);
+    border:1px solid rgba(233,196,106,.5);color:var(--gold-soft);font-size:13px;letter-spacing:1px;
+    box-shadow:0 10px 30px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  @media (max-width:720px){
+    #quest-panel{padding:18px 16px 14px;width:min(94vw,420px);}
+    /* 手机端按钮太多会换行挤成三排，把仙箓挪到底部左侧 */
+    #quest-btn{position:fixed;left:14px;bottom:14px;z-index:26;padding:9px 12px;font-size:12px;}
+    #prompt{bottom:66px;top:auto;font-size:12px;max-width:92vw;white-space:normal;text-align:center;line-height:1.4;}
+    #toast{top:auto;bottom:118px;font-size:12px;max-width:90vw;text-align:center;}
+  }
+
+  /* ---------- 玩法面板 ---------- */
+  #game-btn.on{border-color:rgba(127,208,255,.6);color:#eaf7ff;background:linear-gradient(180deg,rgba(127,208,255,.22),rgba(127,208,255,.06));}
+  #game-panel{position:fixed;right:16px;top:74px;z-index:27;width:248px;max-height:calc(100vh - 96px);
+    overflow-y:auto;padding:14px;border-radius:16px;
+    background:var(--panel-solid);border:1px solid rgba(233,196,106,.28);backdrop-filter:blur(14px);
+    box-shadow:0 18px 50px rgba(0,0,0,.5);
+    transform:translateX(20px);opacity:0;pointer-events:none;transition:opacity .26s ease,transform .26s ease;}
+  #game-panel.open{opacity:1;pointer-events:auto;transform:translateX(0);}
+  #game-panel .panel-title{margin-bottom:10px;}
+  .game-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+    padding:10px 11px;margin-bottom:7px;border-radius:12px;cursor:pointer;
+    background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);
+    color:var(--text);font-size:12.5px;letter-spacing:.6px;transition:.2s;}
+  .game-item:hover{background:rgba(127,208,255,.10);border-color:rgba(127,208,255,.4);}
+  .game-item.on{background:rgba(127,208,255,.16);border-color:rgba(127,208,255,.55);color:#eaf7ff;}
+  .game-item .gi-ico{width:26px;height:26px;flex:0 0 auto;border-radius:8px;font-size:14px;
+    display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(160deg,rgba(233,196,106,.28),rgba(233,196,106,.06));
+    border:1px solid rgba(233,196,106,.36);color:var(--gold-soft);}
+  .game-item.on .gi-ico{background:linear-gradient(160deg,rgba(127,208,255,.34),rgba(127,208,255,.08));
+    border-color:rgba(127,208,255,.5);color:#eaf7ff;}
+  .game-item .gi-txt{flex:1;min-width:0;}
+  .game-item .gi-sub{display:block;font-size:10.5px;color:var(--text-dim);margin-top:2px;letter-spacing:.3px;}
+  .game-item .gi-tag{font-size:10px;color:var(--gold-soft);letter-spacing:1px;opacity:.85;}
+  .game-moon{margin:10px 0 8px;padding:9px 11px;border-radius:11px;font-size:11.5px;letter-spacing:.8px;
+    background:rgba(159,200,255,.09);border:1px solid rgba(159,200,255,.28);color:#cfe2ff;}
+  .game-hint{font-size:10.5px;line-height:1.7;color:var(--text-dim);letter-spacing:.3px;}
+
+  /* ---------- 御道登阶问答 ---------- */
+  #quiz-panel{position:fixed;left:50%;top:50%;z-index:48;width:min(92vw,440px);
+    transform:translate(-50%,-50%) scale(.96);opacity:0;pointer-events:none;
+    background:var(--panel-solid);border:1px solid rgba(233,196,106,.34);border-radius:18px;
+    padding:20px 20px 18px;backdrop-filter:blur(16px);box-shadow:0 24px 70px rgba(0,0,0,.62);
+    transition:opacity .26s ease,transform .26s ease;}
+  #quiz-panel.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1);}
+  #quiz-close{position:absolute;top:10px;right:12px;border:none;background:none;color:var(--text-dim);font-size:20px;cursor:pointer;line-height:1;}
+  .quiz-q{font-size:13.5px;line-height:1.75;color:var(--text);margin:10px 0 14px;letter-spacing:.6px;}
+  .quiz-q b{color:var(--gold-soft);}
+  .quiz-opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .quiz-opt{padding:10px 12px;border-radius:11px;font-size:12.5px;letter-spacing:.8px;cursor:pointer;
+    background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:var(--text);
+    transition:.18s;text-align:center;}
+  .quiz-opt:hover{background:rgba(233,196,106,.16);border-color:rgba(233,196,106,.5);color:#fff5dd;}
+  @media (max-width:720px){
+    #game-panel{right:10px;left:10px;top:auto;bottom:14px;width:auto;max-height:56vh;}
+    #game-btn{position:fixed;right:14px;bottom:14px;z-index:26;padding:9px 12px;font-size:12px;}
+    .quiz-opts{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Loading overlay -->
+  <div id="loading" class="overlay">
+    <div class="loading-box">
+      <div class="loading-title" data-i18n="loadingTitle">加载天宫中…</div>
+      <div class="progress"><div id="progress-bar"></div></div>
+      <div id="progress-text">0%</div>
+      <div class="loading-sub" data-i18n="loadingSub">正在凝聚云海与殿宇</div>
+    </div>
+  </div>
+
+  <!-- Error overlay -->
+  <div id="error" class="overlay hidden">
+    <div class="error-box">
+      <div class="error-icon">⚠</div>
+      <div class="error-title" id="error-title" data-i18n="errorTitle">加载失败</div>
+      <div class="error-msg" id="error-msg"></div>
+      <button id="retry-btn" class="btn" data-i18n="retry">重试</button>
+    </div>
+  </div>
+
+  <!-- Top bar -->
+  <header id="topbar">
+    <div class="brand">
+      <span class="brand-zh">天庭</span>
+      <span class="brand-en">Heavenly Court</span>
+    </div>
+    <div class="top-actions">
+      <button id="lang-btn" class="btn">EN</button>
+      <button id="daynight-btn" class="btn active" data-i18n="dayNight">昼夜流转</button>
+      <button id="meteor-btn" class="btn active" data-i18n="meteor">流星雨</button>
+      <button id="voice-btn" class="btn active" data-i18n="voice">语音讲解</button>
+      <button id="tour-btn" class="btn" data-i18n="tour">自动漫游</button>
+      <button id="beast-btn" class="btn" data-i18n="beasts">瑞兽图鉴</button>
+      <button id="quest-btn" class="btn"><span id="quest-count">仙箓 0/3</span></button>
+      <button id="game-btn" class="btn" data-i18n="games">玩法</button>
+      <button id="reset-btn" class="btn" data-i18n="reset">重置视角</button>
+    </div>
+  </header>
+
+  <!-- 仙箓册 -->
+  <div id="quest-panel">
+    <button id="quest-close">×</button>
+    <div class="qp-title"><span data-i18n="questTitle">仙箓册</span></div>
+    <div class="qp-sub" id="qp-sub"></div>
+    <div class="qp-banner" id="qp-banner"></div>
+    <div id="slip-list"></div>
+    <div class="qp-foot"><button id="quest-reset" class="btn" data-i18n="questReset">重头来过</button></div>
+  </div>
+
+  <div id="toast"></div>
+  <div id="prompt"></div>
+
+  <!-- 玩法面板 -->
+  <aside id="game-panel">
+    <div class="panel-title" data-i18n="games">玩法</div>
+    <div id="game-list"></div>
+    <div class="game-moon" id="moon-info"></div>
+    <div class="game-hint" data-i18n="gameHint">引路凤凰会带你前往最近的玉简；观星连线点亮空殿；云海垂钓抛钩入云；镜池入水可见水中天。</div>
+  </aside>
+
+  <!-- 御道登阶问答 -->
+  <div id="quiz-panel">
+    <button id="quiz-close">×</button>
+    <div class="qp-title"><span data-i18n="quizTitle">御道登阶</span></div>
+    <div id="quiz-q" class="quiz-q"></div>
+    <div id="quiz-opts" class="quiz-opts"></div>
+  </div>
+
+  <!-- Landmark panel -->
+  <aside id="panel">
+    <div class="panel-title" data-i18n="landmarks">天宫地标</div>
+    <div id="landmark-list"></div>
+  </aside>
+  <button id="panel-toggle" class="btn"><span data-i18n="landmarks">地标</span> ▲</button>
+
+  <!-- Info card -->
+  <div id="info-card" class="hidden">
+    <button id="info-close">×</button>
+    <div id="info-name"></div>
+    <div id="info-desc"></div>
+  </div>
+
+  <!-- Beast bestiary panel -->
+  <aside id="beast-panel">
+    <div class="panel-title" data-i18n="beasts">瑞兽图鉴</div>
+    <div id="beast-list"></div>
+  </aside>
+  <button id="beast-toggle" class="btn"><span data-i18n="beasts">瑞兽</span> ▲</button>
+
+  <!-- Hint -->
+  <div id="hint" data-i18n="hint">拖拽旋转 · 滚轮缩放 · 点击建筑聆听讲解</div>
+
+  <!-- Fallback: if module fails to load, show error with retry -->
+  <script>
+    window.__courtReady = false;
+    function showFatal(msg){
+      var ld=document.getElementById('loading'); if(ld) ld.classList.add('hidden');
+      var er=document.getElementById('error'); if(er) er.classList.remove('hidden');
+      var m=document.getElementById('error-msg'); if(m && msg) m.textContent=msg;
+    }
+    document.getElementById('retry-btn').addEventListener('click',function(){location.reload();});
+    window.addEventListener('error',function(e){
+      // surface only load-level failures (script/module load)
+      if(e && e.target && (e.target.tagName==='SCRIPT'||e.target.tagName==='LINK')){
+        var isZh=(navigator.language||'zh').toLowerCase().indexOf('zh')===0;
+        showFatal(isZh?'资源加载失败，请检查网络后重试。':'Failed to load resources. Check your network and retry.');
+      }
+    },true);
+    setTimeout(function(){
+      if(!window.__courtReady){
+        var isZh=(navigator.language||'zh').toLowerCase().indexOf('zh')===0;
+        showFatal(isZh?'加载超时，天庭资源未能就绪。请重试。':'Loading timed out. The Heavenly Court failed to initialize. Please retry.');
+      }
+    },22000);
+  </script>
+
+  <script type="importmap">
+  { "imports": { "three": "./vendor/three.module.js" } }
+  </script>
+  <script type="module" src="./main.js"></script>
+  <script src="js/net/track.js"></script>
+  <script src="js/net/realm-gate.js"></script>
+<script src="js/net/realm-trial.js"></script>
+</body>
+</html>

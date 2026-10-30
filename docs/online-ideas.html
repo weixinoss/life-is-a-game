@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>三界联网 · 数据库玩法创意手册（30 条）</title>
+<style>
+:root{
+  --bg:#f6f5f2; --card:#fff; --ink:#1d1c1a; --ink2:#5c5852; --ink3:#8d877e;
+  --line:#e4e0d8; --accent:#8a5a2b; --accent-soft:#f5ece1;
+  --p1:#c0392b; --p2:#b8860b; --p3:#3d7a5a;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:15px/1.7 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;}
+.wrap{max-width:1180px;margin:0 auto;padding:36px 24px 80px}
+header{margin-bottom:28px}
+h1{font-size:27px;margin:0 0 8px;letter-spacing:.5px}
+.sub{color:var(--ink2);font-size:14px}
+.sub b{color:var(--accent)}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin:22px 0 20px;align-items:center}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--ink2);
+  padding:6px 13px;border-radius:20px;font-size:13px;cursor:pointer;user-select:none;transition:.15s}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.grp{margin:34px 0 0}
+.grp h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+.grp h2 .n{width:26px;height:26px;border-radius:6px;background:var(--accent);color:#fff;
+  font-size:14px;display:inline-flex;align-items:center;justify-content:center}
+.grp .why{color:var(--ink3);font-size:13px;margin:0 0 14px 36px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 17px;
+  display:flex;flex-direction:column;gap:8px}
+.card .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.card .id{font-size:12px;color:var(--ink3);font-variant-numeric:tabular-nums}
+.card h3{margin:0;font-size:16px;line-height:1.4}
+.pv{font-size:11.5px;padding:2px 8px;border-radius:4px;white-space:nowrap;font-weight:600}
+.p1{color:var(--p1);background:#fdeceb}
+.p2{color:var(--p2);background:#fdf5e0}
+.p3{color:var(--p3);background:#e9f5ee}
+.desc{margin:0;font-size:14px;color:var(--ink2)}
+.meta{font-size:12.5px;color:var(--ink3);border-top:1px dashed var(--line);padding-top:8px;margin-top:2px}
+.meta div{margin:2px 0}
+.meta b{color:var(--ink2);font-weight:600}
+code{background:var(--accent-soft);color:var(--accent);padding:1px 5px;border-radius:3px;
+  font-family:ui-monospace,Consolas,monospace;font-size:12px}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px;background:var(--card)}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--accent-soft);color:var(--accent);font-weight:600}
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--ink3);font-size:13px}
+h2.tb{font-size:19px;margin:38px 0 2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>三界联网 · 数据库玩法创意手册</h1>
+  <p class="sub">基于已拆分的 <code>js/life/*</code>（人生大富翁）、<code>js/data.js</code>（幽冥地府）、<code>tiangong/main.js</code>（天庭漫游）。
+  每条都是从<b>一个具体数据库原语</b>反推出来的玩法，而不是空谈「加个联网」。<b>共 30 条</b>，按原语分 7 组。</p>
+  <div class="bar" id="bar"></div>
+</header>
+
+<div id="body"></div>
+
+<h2 class="tb">数据库表设计（最小可用集）</h2>
+<table>
+<tr><th style="width:170px">表</th><th>字段</th><th>支撑玩法</th></tr>
+<tr><td><code>players</code></td><td>uid, nickname, merit(阴德), lifespan_token(阳寿), judge_score(明察), seasons, created_at</td><td>1,18,24,25</td></tr>
+<tr><td><code>lives</code>（一世）</td><td>id, uid, job, start_at, end_at, day, money, rating, ending_type, score, dignity_low_cnt</td><td>1,12,13,18</td></tr>
+<tr><td><code>saves</code></td><td>uid, state_json(C 全量序列化), server_day, updated_at</td><td>2</td></tr>
+<tr><td><code>day_log</code></td><td>uid, life_id, day, season, weather, pos, money, stamina, spirit, face, choice_id</td><td>3,15,17,28</td></tr>
+<tr><td><code>karma</code></td><td>id, from_life, text, effects, claimed_by, claimed_at</td><td>5</td></tr>
+<tr><td><code>relics</code> / <code>bottles</code></td><td>id, from_life, kind, text, payload, picks, status</td><td>4,6,7</td></tr>
+<tr><td><code>cases</code>（案卷）</td><td>id, life_id, fragments[6], verdicts[], final, status(open/closed)</td><td>9</td></tr>
+<tr><td><code>ugc_cards</code></td><td>id, author, season, job, title, options[], status(pending/approved/rejected), votes</td><td>10,27</td></tr>
+<tr><td><code>steles</code>（碑林）</td><td>id, uid, life_id, epitaph, ending, likes, status</td><td>11</td></tr>
+<tr><td><code>world_state</code>（单行）</td><td>clock, weather, price_index, online_cnt, festival</td><td>21,22,23,20</td></tr>
+<tr><td><code>orders</code>（交易所）</td><td>id, uid, side(buy/sell), item, qty, price, status</td><td>24,25,26</td></tr>
+<tr><td><code>wishes</code>（香火）</td><td>id, from_uid, to_uid, incense, created_at</td><td>29</td></tr>
+</table>
+
+<footer>
+优先级说明：<span class="pv p1">P0</span> 只需建表 + 轮询，1～2 天可出原型；
+<span class="pv p2">P1</span> 需要服务端定时/事务逻辑；
+<span class="pv p3">P2</span> 涉及 UGC 审核、AI 调用或实时同步，需谨慎评估。
+</footer>
+</div>
+
+<script>
+const DATA=[
+{g:"A",t:"跨会话持久化：存档本身就是资产",w:"单机存档只是快照；有了数据库，存档可以累积、继承、被别人读到。",items:[
+{n:1,name:"三世账本",p:"p1",d:"每一世结局写入 lives 表，新一世按前世评分继承 3%~8% 的「因果分」作为开局加成。玩家可以在天庭「仙箓册」里翻自己的前世履历。",db:"INSERT + 按 uid 聚合查询",mod:"90-season-end.js 结局结算处写 lives；91-jobpick.js 读前世分给初始属性"},
+{n:2,name:"断点续命（服务端权威）",p:"p1",d:"每天结束把状态对象 C 序列化进 saves；换手机、换浏览器、清缓存都能接着玩。天数由服务器时钟决定，本地改不动存档。",db:"UPSERT + 服务端时钟",mod:"82-state-hud.js 的 C 加 toJSON；87-turn.js 每天结束上报"},
+{n:3,name:"人生年表",p:"p1",d:"每天写一条 day_log（季节/天气/坐标/四维数值/选了哪个选项），结局时生成可分享的「一生长图」——钱、体力、精神的折线，配上你经历过的事件标题。",db:"时序表 + 范围查询",mod:"87-turn.js 结算后插 day_log；90-season-end.js 拉全量渲染"},
+{n:4,name:"遗物寄存",p:"p1",d:"结局时选出一件「遗物」——一句话加一个数值倾向（如「+体力上限，但每天多花 5 块」），存进遗物池，别的玩家开局时可能被随机发到。",db:"INSERT + ORDER BY RANDOM LIMIT 1",mod:"90-season-end.js 增加遗物选择步骤；91-jobpick.js 开局抽遗物"}]},
+
+{g:"B",t:"跨用户异步共享：你玩的时候，别人已经玩过了",w:"不需要同时在线，也不需要 WebSocket——这是数据库最划算的用法。",items:[
+{n:5,name:"业力遗产",p:"p1",d:"结局时把你这一生中「非功利性的选择」（扶摔倒的电动车、借工友 500 块、给家里寄钱）打成一条 karma 记录，随机注入另一个新玩家的开局第一张卡：「承某某之因果：去年冬天，有个陌生人替你垫了一次医药费」，然后选还不还。",db:"INSERT + 随机抽样 + 领取状态位",mod:"87-turn.js 给事件选项标记 altruistic；90-season-end.js 产出 karma"},
+{n:6,name:"孟婆汤漂流瓶",p:"p1",d:"喝孟婆汤时随机捞一条匿名遗言。玩家在世时写下的，死后才投递——延迟满足感极强。",db:"抽样查询 + 状态位防重复",mod:"地府 openRitual('soup') 改读服务器 bottles 表"},
+{n:7,name:"三生石 · 隔世信",p:"p2",d:"写一封信，指定投递条件：同身份 / 第 N 天 / 某种天气 / 某种处境。只有满足条件的人才会收到它。",db:"带条件的抽样查询",mod:"地府 openRitual('stone') + 天庭写信界面"},
+{n:8,name:"望乡台 · 阳间牵挂",p:"p2",d:"在世时可绑定一个「牵挂」（一个人、一件事、一个地方），死后挂在望乡台。其他玩家可登台探望并留下回应，回应会回到你的碑林。",db:"一对多关联 + 通知队列",mod:"地府 openRitual('wangxiang')；人生侧增加「牵挂」录入"},
+{n:9,name:"判官陪审",p:"p2",d:"一生结束后自动生成案卷：只提交 6 个关键片段，不含任何数值。3 名在线玩家各自判「善/平/恶」，你可以用 60 秒辩护。判得准的得「明察」声望，判得离谱的会被系统收回判官资格。",db:"cases 表 + 匹配队列 + 声望原子计数",mod:"js/data.js 的 verdicts 扩成判词库；90-season-end.js 生成案卷"},
+{n:10,name:"判词库众创",p:"p2",d:"玩家投稿判词进入 verdicts_ugc，被系统采用次数越多，判官声望越高。让地府的文案库自己长出来。",db:"UGC 表 + 审核状态机",mod:"js/data.js verdicts 增加 ugc 分支"},
+{n:11,name:"遗言碑林",p:"p1",d:"全服结局留言做成碑林，可按身份、结局类型筛选浏览、点赞。这是成本最低的「世界感」——你一眼看见几千个人活过了几千种人生。",db:"分页查询 + 计数",mod:"90-season-end.js 提交墓志铭；天庭增加碑林场景"}]},
+
+{g:"C",t:"聚合查询：让「全服的人怎么活的」变成玩法",w:"单机游戏永远不知道别人怎么玩；有了数据库，其他玩家的选择本身就是内容。",items:[
+{n:12,name:"全服人生报告",p:"p1",d:"每季度发布一次：这一季有多少人破产、多少人猝死、多少人考编上岸、平均活到第几天。GROUP BY 直接出，是最便宜的世界观内容。",db:"GROUP BY / AVG / COUNT",mod:"纯服务端定时任务 + 天庭公告板"},
+{n:13,name:"身份天梯与冷门身份榜",p:"p1",d:"21 种身份各自的通关率、平均分、平均寿命全公开。官方据此给冷门身份发「稀缺加成」——没人当保洁？那这季保洁收入 +20%。",db:"按 job 分组聚合 + 动态系数",mod:"85-weather-fx.js 同类机制扩展成 job_bonus"},
+{n:14,name:"最低分殿堂",p:"p1",d:"反向排行榜：专门给「体面值低过头次数」和最低评分排名。这游戏的乐趣一半在比惨，别浪费。",db:"ORDER BY ASC + LIMIT",mod:"90-season-end.js 上报 dignity_low_cnt"},
+{n:15,name:"平行人生对照",p:"p2",d:"找到同身份、同季节、同天气起点的另一个玩家，做成分支对照树：「另一个你在第 37 天选择了留下，而你选择了离开」。结局时揭晓。",db:"按多维条件匹配查询",mod:"90-season-end.js 结局页增加对照分支"},
+{n:16,name:"地标省份榜",p:"p1",d:"24 座地标带省份标签，统计各省玩家的平均财富、平均停留天数、最常触发的事件。「哪个省的人最能熬」天然有传播性。",db:"按 landmark/province 分组",mod:"30-landmarks.js 的省份表 + 上报"},
+{n:17,name:"事件卡体检",p:"p2",d:"每张卡的平均选择分布 + 选择后 30 天的存活率。找出「坑卡」和「送分卡」，用真实数据调平衡，而不是拍脑袋。",db:"关联 day_log 回放统计",mod:"60/61/62-events 的卡片加 card_id"}]},
+
+{g:"D",t:"时序与赛季：让一辈子有意义",w:"数据库让「这一世」成为可结算、可排名、可复盘的赛季。",items:[
+{n:18,name:"赛季轮回榜",p:"p2",d:"每一世 = 一个赛季，赛季末结算发「轮回印记」（可展示的天庭徽章）。排行榜按赛季重置，让新玩家也有机会上榜。",db:"赛季分区 + 定时结算",mod:"90-season-end.js + 天庭徽章展示"},
+{n:19,name:"限时事件卡",p:"p1",d:"服务器按真实日期注入事件卡：双十一、春运、暴雨预警、年终裁员、开学季。只在特定日期出现，制造「今天必须上线」的理由。",db:"按日期范围查询 + 注入",mod:"60-data-events.js 增加 live 分支"},
+{n:20,name:"三界节气历",p:"p2",d:"按真实节气触发全服事件：清明地府开放、中元百鬼夜行、寒衣节送衣、春节天庭香火翻倍。三套场景跟着日历轮转。",db:"服务端定时 + world_state",mod:"三套场景共读 world_state.festival"}]},
+
+{g:"E",t:"服务器时钟与共时世界：所有人活在同一片天底下",w:"全服共享一个 world_state 单行表，就能造出「世界」的感觉。",items:[
+{n:21,name:"共时天气",p:"p1",d:"全服同一场雪。你在北京遇到的暴雨，会让广州的玩家也滑一跤。天气由服务器抽签后广播，所有人共享同一个 weather 字段。",db:"world_state 单行 + 轮询",mod:"85-weather-fx.js 抽签改为读服务器"},
+{n:22,name:"昼夜潮汐",p:"p2",d:"按在线人数决定「白天还是夜晚」：夜晚在线人少，但收益系数更高，鼓励错峰上线。服务器用在线人数自动调节经济。",db:"在线计数 + 动态系数",mod:"80-daynight.js 改为读服务器昼夜"},
+{n:23,name:"全服财富通胀",p:"p2",d:"物价系数 = f(全服总财富)。玩家集体摆烂则物价下跌、机会变多；集体暴富则物价飞涨。让每个玩家的选择真实影响所有人的世界。",db:"全表 SUM + 原子更新系数",mod:"82-state-hud.js 的 money 消费走 price_index"}]},
+
+{g:"F",t:"原子交易与东方神话原生经济",w:"事务保证不超发——这是数据库才能提供的确定性。",items:[
+{n:24,name:"阴德交易所",p:"p2",d:"玩家间挂单交易「阴德」。阴德只能靠在世时的善举获得，死后才能花。挂单撮合用事务保证不超发。",db:"订单表 + 事务",mod:"天庭增加交易所场景"},
+{n:25,name:"枉死城 · 借寿（替身债）",p:"p3",d:"枉死的玩家可以挂出替身悬赏，其他玩家借出自己的「阳寿天数」换他的阴德。纯正的东方神话原生经济，辨识度极高，但平衡性风险也大。",db:"订单 + 事务 + 违约清算",mod:"地府 hell 区扩展枉死城"},
+{n:26,name:"典当行",p:"p3",d:"用「未来的某一天」抵押换今天的钱。到期不赎回，就失去那天的自主权——那一天由系统代你掷骰、代你选择。",db:"抵押记录 + 定时清算",mod:"86-dice.js 增加 auto 模式"}]},
+
+{g:"G",t:"UGC 与 AI：让内容自己长出来",w:"审核状态机 + 免密钥 LLM 调用，是数据库时代最低成本的内容生产方案。",items:[
+{n:27,name:"事件卡工坊",p:"p2",d:"玩家写事件卡（标题 + 2~4 个选项 + 数值影响），进审核池，投票通过的进入官方卡池并署名。你的卡会被别人抽到。",db:"UGC 表 + 审核状态机 + 投票计数",mod:"60-data-events.js 增加 ugc 分支"},
+{n:28,name:"AI 专属结局",p:"p2",d:"把你这一生的 day_log 喂给大模型，生成一段专属判词和墓志铭——它不是模板，是真正读完了你这一辈子才写出来的。",db:"day_log 全量读取 + LLM 调用",mod:"90-season-end.js 结局卡增加 AI 文案"},
+{n:29,name:"香火祈愿",p:"p1",d:"在天庭给在线的陌生玩家上一炷香，双方各得一个 buff。你不知道他是谁，只知道他正在第几天、什么身份、过得怎么样。",db:"点对点写入 + 通知",mod:"天庭香炉交互 + 人生侧 buff 生效"},
+{n:30,name:"鬼火指路",p:"p2",d:"地府场景里显示其他玩家留下的「鬼火」——位置热点聚合。鬼火密集的地方说明那里发生过故事，玩家会自发去挤。",db:"位置热点 GROUP BY",mod:"地府 js/main.js 渲染层加热点"}]}
+];
+
+const PN={p1:"P0",p2:"P1",p3:"P2"};
+const PV={p1:"p1",p2:"p2",p3:"p3"};
+const body=document.getElementById('body'), bar=document.getElementById('bar');
+bar.innerHTML='<span class="chip on" data-g="all">全部 30 条</span>'+
+  DATA.map(x=>`<span class="chip" data-g="${x.g}">${x.g} · ${x.t.split('：')[0]}</span>`).join('');
+function render(g){
+  body.innerHTML=DATA.filter(x=>g==='all'||x.g===g).map(x=>`
+  <div class="grp"><h2><span class="n">${x.g}</span>${x.t}</h2>
+  <p class="why">${x.w}</p><div class="grid">${
+    x.items.map(i=>`<div class="card">
+      <div class="top"><h3>${i.n}. ${i.name}</h3><span class="pv ${PV[i.p]}">${PN[i.p]}</span></div>
+      <p class="desc">${i.d}</p>
+      <div class="meta"><div><b>数据库原语：</b>${i.db}</div><div><b>改造点：</b>${i.mod}</div></div>
+    </div>`).join('')}</div></div>`).join('');
+}
+bar.onclick=e=>{const c=e.target.closest('.chip');if(!c)return;
+  bar.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));
+  c.classList.add('on');render(c.dataset.g);};
+render('all');
+</script>
+</body>
+</html>
